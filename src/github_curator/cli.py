@@ -81,15 +81,21 @@ def trending(
     sort: str = typer.Option("stars", "--sort", "-s", help="Sort by: stars, forks, updated."),
     max_results: int = typer.Option(25, "--max", "-m", help="Maximum number of results."),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: table (default), markdown, json."),
+    language: Optional[str] = typer.Option(None, "--language", "-l", help="Filter by programming language."),
 ) -> None:
     """Search trending repositories on GitHub."""
     from github_curator.formatter import format_as_json, format_as_markdown, format_as_table
     from github_curator.github_api import GitHubAPI
 
-    console.print(f"[bold]Searching: [cyan]{query}[/cyan] (sort={sort}, max={max_results})[/bold]")
+    # Append language filter to query if specified
+    effective_query = query
+    if language:
+        effective_query = f"{query} language:{language}"
+
+    console.print(f"[bold]Searching: [cyan]{effective_query}[/cyan] (sort={sort}, max={max_results})[/bold]")
 
     with GitHubAPI() as api:
-        repos = api.search_repos(query=query, sort_by=sort, max_results=max_results)
+        repos = api.search_repos(query=effective_query, sort_by=sort, max_results=max_results)
 
     if not repos:
         console.print("[yellow]No results found.[/yellow]")
@@ -191,6 +197,79 @@ def export(
     else:
         console.print()
         console.print(result)
+
+
+@app.command()
+def stats(
+    file: Path = typer.Argument(..., help="Path to an awesome-list markdown file."),
+) -> None:
+    """Show summary statistics for all GitHub repos in a markdown file."""
+    from collections import Counter
+
+    from rich.table import Table
+
+    from github_curator.github_api import GitHubAPI
+    from github_curator.parser import parse_markdown_repos
+
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(code=1)
+
+    content = file.read_text(encoding="utf-8")
+    repo_refs = parse_markdown_repos(content)
+
+    if not repo_refs:
+        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
+        raise typer.Exit()
+
+    console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
+
+    repos = []
+    with GitHubAPI() as api:
+        for ref in repo_refs:
+            try:
+                info = api.get_repo_info(ref.owner, ref.name)
+                repos.append(info)
+                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+            except Exception as e:
+                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+
+    if not repos:
+        console.print("[yellow]No repository data retrieved.[/yellow]")
+        raise typer.Exit()
+
+    total_repos = len(repos)
+    total_stars = sum(r.stars for r in repos)
+    avg_stars = total_stars / total_repos
+    most_starred = max(repos, key=lambda r: r.stars)
+
+    # Summary table
+    summary_table = Table(title="Repository Statistics", show_lines=True)
+    summary_table.add_column("Metric", style="cyan")
+    summary_table.add_column("Value", style="yellow", justify="right")
+    summary_table.add_row("Total repos", str(total_repos))
+    summary_table.add_row("Total stars", f"{total_stars:,}")
+    summary_table.add_row("Average stars", f"{avg_stars:,.1f}")
+    summary_table.add_row("Most starred", f"{most_starred.full_name} ({most_starred.stars:,} ⭐)")
+    console.print()
+    console.print(summary_table)
+
+    # Language distribution table
+    lang_counter: Counter[str] = Counter()
+    for r in repos:
+        lang_counter[r.language or "Unknown"] += 1
+
+    lang_table = Table(title="Language Distribution", show_lines=False)
+    lang_table.add_column("Language", style="magenta")
+    lang_table.add_column("Count", justify="right", style="yellow")
+    lang_table.add_column("Percentage", justify="right", style="green")
+
+    for lang, count in lang_counter.most_common():
+        pct = count / total_repos * 100
+        lang_table.add_row(lang, str(count), f"{pct:.1f}%")
+
+    console.print()
+    console.print(lang_table)
 
 
 if __name__ == "__main__":
