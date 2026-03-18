@@ -4,12 +4,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/github-curator)](https://pypi.org/project/github-curator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**あなたの awesome-list、スター数いつのデータですか？**
-
-awesome-xxx リストのスター数は放置すると古くなり、リンク切れも気づかない。
-でも数百リポジトリを手動で確認するのは現実的じゃない。
-
-**github-curator は awesome-list のメンテナンスを自動化します。**
+awesome-xxx リストのスター数更新・リンク切れチェック・トレンド検索を行う CLI ツールです。
+Markdown ファイルを渡すだけで、記載されている全リポジトリの情報を一括で取得・更新できます。
 
 ```bash
 # Markdown ファイルを渡すだけ。全リポジトリのスター数を一括更新。
@@ -32,17 +28,14 @@ $ github-curator check-links awesome-slam.md
 | リストの統計が知りたい | `stats` で総スター数・言語分布などをサマリー表示 |
 | 定期メンテを自動化したい | GitHub Actions で週次自動更新 |
 
-姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator)（arXiv 新着論文の自動提案）と組み合わせると、awesome-list のメンテナンスがほぼ全自動になります。
+姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator)（arXiv 新着論文の自動提案）と組み合わせて使えます。
 
 ---
 
-**Are your awesome-list star counts still up to date?**
+A CLI tool for updating star counts, checking broken links, and searching trending repos in awesome-xxx lists.
+Pass a Markdown file and it fetches the latest info for all listed repositories.
 
-Star counts in awesome-xxx lists go stale fast, and broken links pile up silently. Manually checking hundreds of repos isn't practical.
-
-github-curator automates awesome-list maintenance: bulk star updates, dead link detection, trending repo discovery, and list statistics — all from the CLI.
-
-Works alongside [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) (automated new paper suggestions) for near-fully-automated list maintenance. Both tools share compatible JSON export formats.
+Works alongside [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) (new paper suggestions from arXiv). Both tools share compatible JSON export formats.
 
 ## インストール / Installation
 
