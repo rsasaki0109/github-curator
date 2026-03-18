@@ -87,6 +87,69 @@ github-curator export awesome-robotics.md --format json --output repos.json
 github-curator export awesome-robotics.md --format markdown --output repos.md
 ```
 
+### 実行サンプル / Examples
+
+#### トレンドリポジトリ検索 / Trending Repos
+
+```
+$ github-curator trending "topic:slam" --max 5
+Searching: topic:slam (sort=stars, max=5)
+                              GitHub Repositories
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Repository                         ┃  Stars ┃ Forks ┃ Language ┃ Updated  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
+│ AtsushiSakai/PythonRobotics        │ 28,909 │ 7,239 │ Python   │ 2026-03  │
+│ cartographer-project/cartographer  │  7,801 │ 2,328 │ C++      │ 2026-03  │
+│ gaoxiang12/slambook                │  7,372 │ 3,317 │ C++      │ 2026-03  │
+└────────────────────────────────────┴────────┴───────┴──────────┴──────────┘
+```
+
+#### 言語フィルタ付きトレンド / Trending with Language Filter
+
+```
+$ github-curator trending "topic:robotics" --language python --max 5
+Searching: topic:robotics language:python (sort=stars, max=5)
+                              GitHub Repositories
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Repository                  ┃  Stars ┃  Forks ┃ Language ┃ Updated  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
+│ commaai/openpilot           │ 60,362 │ 10,714 │ Python   │ 2026-03  │
+│ AtsushiSakai/PythonRobotics │ 28,909 │  7,239 │ Python   │ 2026-03  │
+│ zauberzeug/nicegui          │ 15,524 │    910 │ Python   │ 2026-03  │
+│ DLR-RM/stable-baselines3    │ 12,920 │  2,090 │ Python   │ 2026-03  │
+│ kornia/kornia               │ 11,120 │  1,162 │ Python   │ 2026-03  │
+└─────────────────────────────┴────────┴────────┴──────────┴──────────┘
+```
+
+#### スター数更新 / Update Stars
+
+```
+$ github-curator update-stars awesome-robotics.md
+Updating stars in awesome-robotics.md ...
+  API rate limit remaining: 4985/5000
+
+Changes (3):
+  AtsushiSakai/PythonRobotics: 28,500 -> 28,909 (+409)
+  cartographer-project/cartographer: 7,750 -> 7,801 (+51)
+
+Updated awesome-robotics.md
+```
+
+#### リンク切れチェック / Check Links
+
+```
+$ github-curator check-links awesome-robotics.md
+Checking 15 repositories ...
+  OK  AtsushiSakai/PythonRobotics
+  OK  cartographer-project/cartographer
+  FAIL old-user/deleted-repo — Not Found
+
+1 broken link(s) found:
+  - old-user/deleted-repo: Not Found
+```
+
+> **Note**: update-stars and check-links examples are illustrative (not real output).
+
 ## arxiv-curator との連携 / Interoperability with arxiv-curator
 
 両ツールの JSON 出力は共通フォーマットを共有しています。
