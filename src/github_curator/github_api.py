@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from github import Auth, Github, GithubException, RateLimitExceededException
@@ -38,9 +39,7 @@ class GitHubAPI:
                 if attempt < max_retries - 1:
                     reset_time = self._client.get_rate_limit().core.reset
                     wait = max(
-                        (reset_time - __import__("datetime").datetime.now(
-                            __import__("datetime").timezone.utc
-                        )).total_seconds() + 1,
+                        (reset_time - datetime.now(timezone.utc)).total_seconds() + 1,
                         _RATE_LIMIT_WAIT_SECONDS,
                     )
                     time.sleep(min(wait, _RATE_LIMIT_WAIT_SECONDS))

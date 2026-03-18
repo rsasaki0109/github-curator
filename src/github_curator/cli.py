@@ -9,6 +9,8 @@ import typer
 from rich.console import Console
 
 from github_curator import __version__
+from github_curator.models import RepoInfo
+from github_curator.parser import RepoRef, parse_markdown_repos
 
 app = typer.Typer(
     name="github-curator",
@@ -16,6 +18,32 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+def _load_repos_from_file(file: Path, console: Console) -> list[RepoRef]:
+    """Read a markdown file and extract GitHub repo references."""
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(code=1)
+    content = file.read_text(encoding="utf-8")
+    repos = parse_markdown_repos(content)
+    if not repos:
+        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
+        raise typer.Exit()
+    return repos
+
+
+def _fetch_repo_infos(refs: list[RepoRef], api, console: Console) -> list[RepoInfo]:
+    """Fetch RepoInfo for each ref, skipping failures."""
+    repos = []
+    for ref in refs:
+        try:
+            info = api.get_repo_info(ref.owner, ref.name)
+            repos.append(info)
+            console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+        except Exception as e:
+            console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+    return repos
 
 
 def _version_callback(value: bool) -> None:
@@ -81,18 +109,8 @@ def check_links(
 ) -> None:
     """Verify all GitHub links in a markdown file are still alive."""
     from github_curator.github_api import GitHubAPI
-    from github_curator.parser import parse_markdown_repos
 
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
-        raise typer.Exit(code=1)
-
-    content = file.read_text(encoding="utf-8")
-    repos = parse_markdown_repos(content)
-
-    if not repos:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
-        raise typer.Exit()
+    repos = _load_repos_from_file(file, console)
 
     console.print(f"[bold]Checking {len(repos)} repositories ...[/bold]")
     broken: list[tuple[str, str]] = []
@@ -125,30 +143,13 @@ def export(
     """Export repository data from a markdown file to JSON or markdown."""
     from github_curator.formatter import format_as_json, format_as_markdown
     from github_curator.github_api import GitHubAPI
-    from github_curator.parser import parse_markdown_repos
 
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
-        raise typer.Exit(code=1)
-
-    content = file.read_text(encoding="utf-8")
-    repos_refs = parse_markdown_repos(content)
-
-    if not repos_refs:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
-        raise typer.Exit()
+    repos_refs = _load_repos_from_file(file, console)
 
     console.print(f"[bold]Fetching info for {len(repos_refs)} repositories ...[/bold]")
 
-    repos = []
     with GitHubAPI() as api:
-        for ref in repos_refs:
-            try:
-                info = api.get_repo_info(ref.owner, ref.name)
-                repos.append(info)
-                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
-            except Exception as e:
-                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+        repos = _fetch_repo_infos(repos_refs, api, console)
 
     fmt = format.lower()
     if fmt == "markdown":
@@ -174,30 +175,13 @@ def stats(
     from rich.table import Table
 
     from github_curator.github_api import GitHubAPI
-    from github_curator.parser import parse_markdown_repos
 
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
-        raise typer.Exit(code=1)
-
-    content = file.read_text(encoding="utf-8")
-    repo_refs = parse_markdown_repos(content)
-
-    if not repo_refs:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
-        raise typer.Exit()
+    repo_refs = _load_repos_from_file(file, console)
 
     console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
 
-    repos = []
     with GitHubAPI() as api:
-        for ref in repo_refs:
-            try:
-                info = api.get_repo_info(ref.owner, ref.name)
-                repos.append(info)
-                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
-            except Exception as e:
-                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+        repos = _fetch_repo_infos(repo_refs, api, console)
 
     if not repos:
         console.print("[yellow]No repository data retrieved.[/yellow]")
@@ -243,24 +227,12 @@ def health(
     only_problems: bool = typer.Option(False, "--only-problems", help="Show only warning/critical repos."),
 ) -> None:
     """Check health status of all repos in a markdown file."""
-    import sys
-
     from rich.table import Table
 
     from github_curator.github_api import GitHubAPI
     from github_curator.health import compute_health
-    from github_curator.parser import parse_markdown_repos
 
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
-        raise typer.Exit(code=1)
-
-    content = file.read_text(encoding="utf-8")
-    repo_refs = parse_markdown_repos(content)
-
-    if not repo_refs:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
-        raise typer.Exit()
+    repo_refs = _load_repos_from_file(file, console)
 
     console.print(f"[bold]Checking health of {len(repo_refs)} repositories ...[/bold]")
 
@@ -368,30 +340,13 @@ def dedupe(
     """Detect duplicate and related repositories (forks of same upstream)."""
     from github_curator.dedupe import find_duplicates
     from github_curator.github_api import GitHubAPI
-    from github_curator.parser import parse_markdown_repos
 
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
-        raise typer.Exit(code=1)
-
-    content = file.read_text(encoding="utf-8")
-    repo_refs = parse_markdown_repos(content)
-
-    if not repo_refs:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
-        raise typer.Exit()
+    repo_refs = _load_repos_from_file(file, console)
 
     console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
 
-    repos = []
     with GitHubAPI() as api:
-        for ref in repo_refs:
-            try:
-                info = api.get_repo_info(ref.owner, ref.name)
-                repos.append(info)
-                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
-            except Exception as e:
-                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+        repos = _fetch_repo_infos(repo_refs, api, console)
 
     groups = find_duplicates(repos)
 
