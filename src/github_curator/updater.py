@@ -11,8 +11,6 @@ from github_curator.github_api import GitHubAPI
 from github_curator.models import RepoInfo, StarDiff
 from github_curator.parser import RepoRef, extract_star_count, parse_markdown_repos
 
-console = Console()
-
 # Badge pattern: ![Stars](https://img.shields.io/github/stars/owner/repo)
 _BADGE_RE = re.compile(
     r"!\[Stars\]\(https://img\.shields\.io/github/stars/[^)]+\)"
@@ -26,6 +24,7 @@ def update_awesome_stars(
     markdown_file_path: str | Path,
     api: GitHubAPI | None = None,
     dry_run: bool = False,
+    console: Console | None = None,
 ) -> list[StarDiff]:
     """Read a markdown file, fetch star counts, and update badges in-place.
 
@@ -33,10 +32,13 @@ def update_awesome_stars(
         markdown_file_path: Path to the markdown file.
         api: Optional GitHubAPI instance (creates one if not provided).
         dry_run: If True, do not write changes to disk.
+        console: Optional Console for output. Creates one if not provided.
 
     Returns:
         List of StarDiff objects showing what changed.
     """
+    if console is None:
+        console = Console()
     path = Path(markdown_file_path)
     content = path.read_text(encoding="utf-8")
     repos = parse_markdown_repos(content)

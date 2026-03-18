@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [
     {name = "rsasaki0109"},
 ]
-keywords = ["github", "awesome-list", "curation", "cli"]
+keywords = ["github", "health-check", "github-api", "repository-analysis", "curation", "cli"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

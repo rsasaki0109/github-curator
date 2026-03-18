@@ -1,6 +1,7 @@
 """Tests for github_curator.models."""
 
 import json
+from datetime import datetime, timezone
 
 from github_curator.models import RepoInfo, StarDiff
 
@@ -43,6 +44,37 @@ def test_repo_info_to_json_valid():
     assert data["owner"] == "alice"
     assert data["stars"] == 100
     assert data["type"] == "github_repo"
+
+
+def test_repo_info_to_dict_with_pushed_at():
+    """Verify that pushed_at datetime is serialized to ISO string in to_dict/to_json."""
+    dt = datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+    repo = RepoInfo(owner="alice", name="alpha", stars=100, pushed_at=dt)
+    d = repo.to_dict()
+    assert d["pushed_at"] == "2024-06-15T12:00:00+00:00"
+    # Verify JSON round-trip works
+    output = repo.to_json()
+    data = json.loads(output)
+    assert data["pushed_at"] == "2024-06-15T12:00:00+00:00"
+
+
+def test_repo_info_to_dict_pushed_at_none():
+    repo = RepoInfo(owner="alice", name="alpha", stars=100)
+    d = repo.to_dict()
+    assert d["pushed_at"] is None
+
+
+def test_repo_info_from_dict_with_pushed_at():
+    """Verify that pushed_at string is converted back to datetime in from_dict."""
+    data = {
+        "owner": "alice",
+        "name": "alpha",
+        "stars": 100,
+        "pushed_at": "2024-06-15T12:00:00+00:00",
+    }
+    repo = RepoInfo.from_dict(data)
+    assert isinstance(repo.pushed_at, datetime)
+    assert repo.pushed_at.year == 2024
 
 
 def test_star_diff():

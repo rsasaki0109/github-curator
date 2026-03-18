@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from github_curator.parser import RepoRef, parse_markdown_repos
@@ -32,18 +31,9 @@ def resolve_repos(
     refs: list[RepoRef] = []
 
     if urls:
-        for url in urls:
-            match = re.search(r"github\.com/([^/]+)/([^/\s)#]+)", url)
-            if match:
-                owner = match.group(1)
-                name = match.group(2).rstrip(".git").rstrip(".")
-                refs.append(
-                    RepoRef(
-                        owner=owner,
-                        name=name,
-                        url=f"https://github.com/{owner}/{name}",
-                    )
-                )
+        # Reuse parser.py's regex for consistency
+        pseudo_md = "\n".join(f"- [{url}]({url})" for url in urls)
+        refs.extend(parse_markdown_repos(pseudo_md))
 
     if file is not None:
         if not file.exists():

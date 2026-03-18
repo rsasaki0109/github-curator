@@ -45,6 +45,10 @@ class RepoInfo:
         Uses a format compatible with arxiv-curator's Paper.to_dict().
         """
         data = asdict(self)
+        if self.pushed_at:
+            data["pushed_at"] = self.pushed_at.isoformat()
+        else:
+            data["pushed_at"] = None
         data["type"] = "github_repo"
         data["full_name"] = self.full_name
         return data
@@ -66,6 +70,9 @@ class RepoInfo:
         """Create RepoInfo from a dictionary."""
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
         filtered = {k: v for k, v in data.items() if k in known_fields}
+        # Convert pushed_at string back to datetime
+        if "pushed_at" in filtered and isinstance(filtered["pushed_at"], str):
+            filtered["pushed_at"] = datetime.fromisoformat(filtered["pushed_at"])
         return cls(**filtered)
 
 

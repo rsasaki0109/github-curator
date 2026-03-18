@@ -131,6 +131,8 @@ Works alongside [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) (n
 
 ## インストール / Installation
 
+**Requirements:** Python 3.10+
+
 ```bash
 pip install github-curator
 ```

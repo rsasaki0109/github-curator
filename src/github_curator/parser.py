@@ -56,8 +56,10 @@ def parse_markdown_repos(markdown_text: str) -> list[RepoRef]:
         owner = match.group(1)
         name = match.group(2)
 
-        # Strip trailing punctuation that the regex might have captured
+        # Strip trailing punctuation and .git suffix
         name = name.rstrip(".")
+        if name.endswith(".git"):
+            name = name[:-4]
 
         # Skip if this looks like a non-repo page (e.g. the 'repo' part is 'issues')
         if name.lower() in _NON_REPO_SUFFIXES:

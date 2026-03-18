@@ -16,11 +16,12 @@ def _make_info(owner="alice", name="repo", stars=200):
 
 
 def test_update_line_stars_with_badge():
-    line = "- [alice/repo](https://github.com/alice/repo) ![Stars](https://img.shields.io/github/stars/alice/repo)"
+    line = "- [alice/repo](https://github.com/alice/repo) ![Stars](https://img.shields.io/github/stars/old-owner/old-repo)"
     ref = _make_ref()
     info = _make_info(stars=500)
     result = _update_line_stars(line, ref, info)
     assert "![Stars](https://img.shields.io/github/stars/alice/repo)" in result
+    assert "old-owner/old-repo" not in result
 
 
 def test_update_line_stars_no_badge():

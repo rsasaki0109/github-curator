@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install github-curator
-        run: pip install github-curator
+        run: pip install -e .
 
       - name: Update star counts
         env:

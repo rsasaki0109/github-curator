@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from rich.table import Table
 
@@ -37,7 +37,7 @@ def format_as_table(repos: list[RepoInfo]) -> Table:
 
 def format_as_markdown(repos: list[RepoInfo]) -> str:
     """Format repos as a markdown list with star badges."""
-    lines = [f"# GitHub Repositories\n", f"_Updated: {datetime.now().strftime('%Y-%m-%d')}_\n"]
+    lines = [f"# GitHub Repositories\n", f"_Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}_\n"]
 
     # Group by language
     by_lang: dict[str, list[RepoInfo]] = {}
@@ -60,7 +60,7 @@ def format_as_json(repos: list[RepoInfo]) -> str:
     """
     data = {
         "source": "github-curator",
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(repos),
         "repositories": [repo.to_dict() for repo in repos],
     }

@@ -60,7 +60,7 @@ def _fetch_repo_infos(refs: list[RepoRef], api, console: Console) -> list[RepoIn
         try:
             info = api.get_repo_info(ref.owner, ref.name)
             repos.append(info)
-            console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+            console.print(f"  [dim]Fetched[/dim] {ref.owner}/{ref.name}")
         except Exception as e:
             console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
     return repos
@@ -170,6 +170,11 @@ def export(
     from github_curator.formatter import format_as_json, format_as_markdown
     from github_curator.github_api import GitHubAPI
 
+    fmt = format.lower()
+    if fmt not in ("json", "markdown"):
+        console.print(f"[red]Error: Unknown format '{format}'. Choose 'json' or 'markdown'.[/red]")
+        raise typer.Exit(code=1)
+
     repos_refs = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Fetching info for {len(repos_refs)} repositories ...[/bold]")
@@ -177,7 +182,6 @@ def export(
     with GitHubAPI() as api:
         repos = _fetch_repo_infos(repos_refs, api, console)
 
-    fmt = format.lower()
     if fmt == "markdown":
         result = format_as_markdown(repos)
     else:
@@ -281,7 +285,7 @@ def health(
                 if only_problems and h["status"] == "healthy":
                     continue
                 results.append((info, h))
-                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+                console.print(f"  [dim]Fetched[/dim] {ref.owner}/{ref.name}")
             except Exception as e:
                 console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
 

@@ -10,6 +10,7 @@ from typing import Optional
 from github import Auth, Github, GithubException, RateLimitExceededException
 
 from github_curator.models import RepoInfo
+from github_curator.parser import RepoRef
 
 _DEFAULT_MAX_RETRIES = 3
 _RATE_LIMIT_WAIT_SECONDS = 60
@@ -40,9 +41,9 @@ class GitHubAPI:
                     reset_time = self._client.get_rate_limit().core.reset
                     wait = max(
                         (reset_time - datetime.now(timezone.utc)).total_seconds() + 1,
-                        _RATE_LIMIT_WAIT_SECONDS,
+                        1,
                     )
-                    time.sleep(min(wait, _RATE_LIMIT_WAIT_SECONDS))
+                    time.sleep(min(wait, 120))
                 else:
                     raise
 
@@ -85,11 +86,15 @@ class GitHubAPI:
 
             return self._retry_on_rate_limit(_check)
         except GithubException as e:
-            return False, f"HTTP {e.status}: {e.data.get('message', 'Unknown error')}"
+            if isinstance(e.data, dict):
+                msg = e.data.get("message", str(e))
+            else:
+                msg = str(e)
+            return False, f"HTTP {e.status}: {msg}"
         except Exception as e:
             return False, str(e)
 
-    def search_repos_by_topic(self, topic: str, max_results: int = 50) -> list:
+    def search_repos_by_topic(self, topic: str, max_results: int = 50) -> list[RepoRef]:
         """Search GitHub repos by topic and return as RepoRef list.
 
         Args:
@@ -99,8 +104,6 @@ class GitHubAPI:
         Returns:
             List of RepoRef sorted by stars descending.
         """
-        from github_curator.parser import RepoRef
-
         repos = self._client.search_repositories(
             query=f"topic:{topic}",
             sort="stars",
