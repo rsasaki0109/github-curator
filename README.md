@@ -32,18 +32,28 @@ $ github-curator check-links awesome-slam.md
 
 ### gh CLI / GitHub API を直接使う場合との違い
 
-GitHub CLI (`gh`) や GitHub REST API でもリポジトリ情報は取得できますが、awesome-list のメンテナンスに特化した機能はありません。
+GitHub CLI (`gh`) でもリポジトリの検索・情報取得は可能です（`gh search repos --topic slam --sort stars --json` など）。
+github-curator の強みは「awesome-list の Markdown ファイルを入力として一括処理する」部分です。
 
-| やりたいこと | gh CLI / GitHub API | github-curator |
+**gh CLI でできること（github-curator と重複する領域）:**
+
+```bash
+# トピック検索 + JSON出力 + 言語フィルタ — gh CLI だけで可能
+gh search repos --topic slam --sort stars --language python --limit 10 --json fullName,stargazersCount
+# 単一リポの情報取得
+gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
+```
+
+**gh CLI だけではやりにくいこと（github-curator の強み）:**
+
+| やりたいこと | gh CLI | github-curator |
 |---|---|---|
-| Markdown 内の全リポのスター数を更新 | `gh api` を 1 リポずつ叩いて、自分で Markdown を書き換える | `github-curator update-stars awesome.md` で一括更新＋差分レポート |
-| リンク切れを検出 | URL を 1 つずつ `gh api` で確認するスクリプトを書く | `github-curator check-links awesome.md` |
-| トピック別トレンド検索 | `gh search repos --topic slam --sort stars` で検索可能 | `github-curator trending "topic:slam"` でリッチなテーブル表示＋JSON/Markdown 出力 |
-| リストの統計サマリー | 自分で集計スクリプトを書く | `github-curator stats awesome.md` で総スター・言語分布を表示 |
-| 定期的にスター数を更新 | GitHub Actions + 自作スクリプト | GitHub Actions テンプレート付き |
-| awesome-list 形式で出力 | API レスポンスを自分で整形 | `--format markdown` でスターバッジ付き Markdown 出力 |
+| Markdown 内の全リポのスター数を一括更新 | リポ URL を手動で抽出 → 1 つずつ `gh api` → Markdown を自分で書き換え | `update-stars awesome.md` で抽出〜更新〜差分レポートまで一括 |
+| リンク切れを一括検出 | スクリプトを書いて 1 つずつチェック | `check-links awesome.md` |
+| リストの統計サマリー | 集計スクリプトを自作 | `stats awesome.md` で総スター・言語分布を表示 |
+| awesome-list 形式で出力 | API レスポンスを自分で整形 | `--format markdown` でスターバッジ付き出力 |
 
-gh CLI は汎用ツールとして優秀ですが、「awesome-list の Markdown を渡して一括処理」というワークフローは github-curator が得意です。
+つまり、**個別リポの検索・情報取得は gh CLI で十分**ですが、**Markdown ファイルを起点にした一括処理**が必要なときに github-curator が役立ちます。
 
 ### GitHub API の制限事項
 
@@ -61,18 +71,28 @@ Pass a Markdown file and it fetches the latest info for all listed repositories.
 
 ### How This Differs from gh CLI / GitHub API
 
-The GitHub CLI (`gh`) and REST API can fetch repository info, but they aren't designed for awesome-list maintenance workflows.
+The GitHub CLI (`gh`) can search repos and fetch info (`gh search repos --topic slam --sort stars --json`, `gh api repos/owner/repo`, etc.).
+github-curator's strength is **processing an awesome-list Markdown file as input**.
 
-| Task | gh CLI / GitHub API | github-curator |
+**What gh CLI already does well (overlapping features):**
+
+```bash
+# Topic search + JSON + language filter — gh CLI can do this
+gh search repos --topic slam --sort stars --language python --limit 10 --json fullName,stargazersCount
+# Single repo info
+gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
+```
+
+**What gh CLI doesn't do easily (github-curator's strength):**
+
+| Task | gh CLI | github-curator |
 |---|---|---|
-| Update star counts in Markdown | Call `gh api` per repo, manually rewrite Markdown | `github-curator update-stars awesome.md` — bulk update + diff report |
-| Detect broken links | Script `gh api` checks one by one | `github-curator check-links awesome.md` |
-| Search trending repos by topic | `gh search repos --topic slam --sort stars` | `github-curator trending "topic:slam"` with rich table + JSON/Markdown output |
-| List statistics summary | Write your own aggregation script | `github-curator stats awesome.md` |
-| Periodic star updates | GitHub Actions + custom script | GitHub Actions template included |
+| Bulk update star counts in Markdown | Manually extract URLs, call `gh api` per repo, rewrite Markdown | `update-stars awesome.md` — extract, update, diff report in one command |
+| Bulk broken link detection | Write a script to check each URL | `check-links awesome.md` |
+| List statistics summary | Write your own aggregation script | `stats awesome.md` — total stars, language distribution |
 | Output in awesome-list format | Format API responses yourself | `--format markdown` with star badges |
 
-gh CLI is a great general-purpose tool; github-curator is specialized for the "pass a Markdown file, process all repos" workflow.
+In short: **for individual repo lookups and search, gh CLI is sufficient**. github-curator is useful when you need **batch processing with a Markdown file as input**.
 
 ### GitHub API Limitations
 
