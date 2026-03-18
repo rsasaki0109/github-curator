@@ -89,6 +89,34 @@ class GitHubAPI:
         except Exception as e:
             return False, str(e)
 
+    def search_repos_by_topic(self, topic: str, max_results: int = 50) -> list:
+        """Search GitHub repos by topic and return as RepoRef list.
+
+        Args:
+            topic: GitHub topic to search for.
+            max_results: Maximum number of results to return.
+
+        Returns:
+            List of RepoRef sorted by stars descending.
+        """
+        from github_curator.parser import RepoRef
+
+        repos = self._client.search_repositories(
+            query=f"topic:{topic}",
+            sort="stars",
+            order="desc",
+        )
+        refs = []
+        for repo in repos[:max_results]:
+            refs.append(
+                RepoRef(
+                    owner=repo.owner.login,
+                    name=repo.name,
+                    url=repo.html_url,
+                )
+            )
+        return refs
+
     def get_rate_limit_info(self) -> dict:
         """Return current rate limit status."""
         rl = self._client.get_rate_limit()

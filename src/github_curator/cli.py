@@ -10,7 +10,7 @@ from rich.console import Console
 
 from github_curator import __version__
 from github_curator.models import RepoInfo
-from github_curator.parser import RepoRef, parse_markdown_repos
+from github_curator.parser import RepoRef
 
 app = typer.Typer(
     name="github-curator",
@@ -20,17 +20,37 @@ app = typer.Typer(
 console = Console()
 
 
-def _load_repos_from_file(file: Path, console: Console) -> list[RepoRef]:
-    """Read a markdown file and extract GitHub repo references."""
-    if not file.exists():
-        console.print(f"[red]File not found: {file}[/red]")
+def _resolve_input(
+    urls: list[str] | None,
+    file: Path | None,
+    topic: str | None,
+    max_results: int,
+    console: Console,
+) -> list[RepoRef]:
+    """Resolve repositories from any combination of input methods."""
+    from github_curator.input import resolve_repos
+
+    if not urls and file is None and not topic:
+        console.print(
+            "[red]Error: Provide at least one input method:[/red]\n"
+            "  - Repository URLs as positional arguments\n"
+            "  - [bold]--file / -f[/bold] with a Markdown or text file\n"
+            "  - [bold]--topic / -t[/bold] with a GitHub topic"
+        )
         raise typer.Exit(code=1)
-    content = file.read_text(encoding="utf-8")
-    repos = parse_markdown_repos(content)
-    if not repos:
-        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
+
+    try:
+        refs = resolve_repos(urls=urls, file=file, topic=topic, max_results=max_results)
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+
+    if not refs:
+        console.print("[yellow]No GitHub repositories found.[/yellow]")
         raise typer.Exit()
-    return repos
+
+    console.print(f"Found [bold]{len(refs)}[/bold] repositories.")
+    return refs
 
 
 def _fetch_repo_infos(refs: list[RepoRef], api, console: Console) -> list[RepoInfo]:
@@ -105,12 +125,15 @@ def update_stars(
 
 @app.command()
 def check_links(
-    file: Path = typer.Argument(..., help="Path to a markdown file to check."),
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
 ) -> None:
-    """Verify all GitHub links in a markdown file are still alive."""
+    """Verify all GitHub links are still alive."""
     from github_curator.github_api import GitHubAPI
 
-    repos = _load_repos_from_file(file, console)
+    repos = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Checking {len(repos)} repositories ...[/bold]")
     broken: list[tuple[str, str]] = []
@@ -136,15 +159,18 @@ def check_links(
 
 @app.command()
 def export(
-    file: Path = typer.Argument(..., help="Path to a markdown file to export repos from."),
-    format: str = typer.Option("json", "--format", "-f", help="Output format: json, markdown."),
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+    format: str = typer.Option("json", "--format", help="Output format: json, markdown."),
     output_file: Optional[Path] = typer.Option(None, "--output", "-o", help="Write to file instead of stdout."),
 ) -> None:
-    """Export repository data from a markdown file to JSON or markdown."""
+    """Export repository data to JSON or markdown."""
     from github_curator.formatter import format_as_json, format_as_markdown
     from github_curator.github_api import GitHubAPI
 
-    repos_refs = _load_repos_from_file(file, console)
+    repos_refs = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Fetching info for {len(repos_refs)} repositories ...[/bold]")
 
@@ -167,16 +193,19 @@ def export(
 
 @app.command()
 def stats(
-    file: Path = typer.Argument(..., help="Path to an awesome-list markdown file."),
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
 ) -> None:
-    """Show summary statistics for all GitHub repos in a markdown file."""
+    """Show summary statistics for GitHub repos."""
     from collections import Counter
 
     from rich.table import Table
 
     from github_curator.github_api import GitHubAPI
 
-    repo_refs = _load_repos_from_file(file, console)
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
 
@@ -199,7 +228,7 @@ def stats(
     summary_table.add_row("Total repos", str(total_repos))
     summary_table.add_row("Total stars", f"{total_stars:,}")
     summary_table.add_row("Average stars", f"{avg_stars:,.1f}")
-    summary_table.add_row("Most starred", f"{most_starred.full_name} ({most_starred.stars:,} ⭐)")
+    summary_table.add_row("Most starred", f"{most_starred.full_name} ({most_starred.stars:,} stars)")
     console.print()
     console.print(summary_table)
 
@@ -223,16 +252,19 @@ def stats(
 
 @app.command()
 def health(
-    file: Path = typer.Argument(..., help="Path to a markdown file to check repo health."),
-    only_problems: bool = typer.Option(False, "--only-problems", help="Show only warning/critical repos."),
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+    only_problems: bool = typer.Option(False, "--only-problems", help="Show only repos with issues."),
 ) -> None:
-    """Check health status of all repos in a markdown file."""
+    """Check health status of GitHub repositories."""
     from rich.table import Table
 
     from github_curator.github_api import GitHubAPI
     from github_curator.health import compute_health
 
-    repo_refs = _load_repos_from_file(file, console)
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Checking health of {len(repo_refs)} repositories ...[/bold]")
 
@@ -335,13 +367,16 @@ def diff(
 
 @app.command()
 def dedupe(
-    file: Path = typer.Argument(..., help="Path to a markdown file to check for duplicates."),
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
 ) -> None:
     """Detect duplicate and related repositories (forks of same upstream)."""
     from github_curator.dedupe import find_duplicates
     from github_curator.github_api import GitHubAPI
 
-    repo_refs = _load_repos_from_file(file, console)
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
 
     console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
 
