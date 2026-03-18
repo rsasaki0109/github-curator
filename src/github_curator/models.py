@@ -25,6 +25,11 @@ class RepoInfo:
     archived: bool = False
     url: str = ""
     topics: list[str] = field(default_factory=list)
+    pushed_at: datetime | None = None
+    open_issues_count: int = 0
+    license_name: str = ""
+    is_fork: bool = False
+    parent_full_name: str = ""
 
     def __post_init__(self) -> None:
         if not self.url:

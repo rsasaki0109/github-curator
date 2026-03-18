@@ -63,48 +63,14 @@ class GitHubAPI:
                 archived=r.archived,
                 url=r.html_url,
                 topics=r.get_topics(),
+                pushed_at=r.pushed_at,
+                open_issues_count=r.open_issues_count,
+                license_name=r.license.name if r.license else "",
+                is_fork=r.fork,
+                parent_full_name=r.parent.full_name if r.parent else "",
             )
 
         return self._retry_on_rate_limit(_fetch)
-
-    def search_repos(
-        self,
-        query: str,
-        sort_by: str = "stars",
-        max_results: int = 25,
-    ) -> list[RepoInfo]:
-        """Search repositories on GitHub.
-
-        Args:
-            query: Search query string (e.g. "topic:robotics language:python").
-            sort_by: Sort field - "stars", "forks", "updated".
-            max_results: Maximum number of results to return.
-
-        Returns:
-            List of RepoInfo objects.
-        """
-
-        def _search():
-            results = self._client.search_repositories(query=query, sort=sort_by)
-            repos: list[RepoInfo] = []
-            for r in results[:max_results]:
-                repos.append(
-                    RepoInfo(
-                        owner=r.owner.login,
-                        name=r.name,
-                        stars=r.stargazers_count,
-                        forks=r.forks_count,
-                        description=r.description or "",
-                        language=r.language or "",
-                        last_updated=r.updated_at.isoformat() if r.updated_at else "",
-                        archived=r.archived,
-                        url=r.html_url,
-                        topics=r.get_topics(),
-                    )
-                )
-            return repos
-
-        return self._retry_on_rate_limit(_search)
 
     def check_repo_exists(self, owner: str, repo: str) -> tuple[bool, Optional[str]]:
         """Check if a repository exists and is accessible.

@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/github-curator)](https://pypi.org/project/github-curator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-awesome-xxx リストのスター数更新・リンク切れチェック・トレンド検索を行う CLI ツールです。
+awesome-xxx リストのスター数更新・リンク切れチェック・ヘルスチェック・差分比較・重複検出を行う CLI ツールです。
 Markdown ファイルを渡すだけで、記載されている全リポジトリの情報を一括で取得・更新できます。
 
 ```bash
@@ -24,7 +24,9 @@ $ github-curator check-links awesome-slam.md
 |---|---|
 | スター数が半年前のまま | `update-stars` で全リポジトリのスター数を一括更新 |
 | リンク切れに気づかない | `check-links` で 404 になったリポジトリを検出 |
-| 分野のトレンドを追いたい | `trending` でトピック・言語別にリポジトリを検索 |
+| リポジトリの健全性を確認したい | `health` でアーカイブ・放置・ライセンス不明を一括検出 |
+| リストの変更差分を見たい | `diff` で追加・削除されたリポジトリを比較 |
+| フォーク重複を検出したい | `dedupe` で同一アップストリームのフォークをグループ化 |
 | リストの統計が知りたい | `stats` で総スター数・言語分布などをサマリー表示 |
 | 定期メンテを自動化したい | GitHub Actions で週次自動更新 |
 
@@ -50,6 +52,9 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 |---|---|---|
 | Markdown 内の全リポのスター数を一括更新 | リポ URL を手動で抽出 → 1 つずつ `gh api` → Markdown を自分で書き換え | `update-stars awesome.md` で抽出〜更新〜差分レポートまで一括 |
 | リンク切れを一括検出 | スクリプトを書いて 1 つずつチェック | `check-links awesome.md` |
+| リポジトリの健全性チェック | 個別に `gh api` で確認 | `health awesome.md` でアーカイブ・放置・ライセンス不明を検出 |
+| リストの差分比較 | `git diff` + 手動で URL を抽出 | `diff awesome.md --ref HEAD~1` で追加・削除を一覧 |
+| フォーク重複検出 | 個別に fork 情報を確認 | `dedupe awesome.md` で同一アップストリームをグループ化 |
 | リストの統計サマリー | 集計スクリプトを自作 | `stats awesome.md` で総スター・言語分布を表示 |
 | awesome-list 形式で出力 | API レスポンスを自分で整形 | `--format markdown` でスターバッジ付き出力 |
 
@@ -66,7 +71,7 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 
 ---
 
-A CLI tool for updating star counts, checking broken links, and searching trending repos in awesome-xxx lists.
+A CLI tool for updating star counts, checking broken links, health checking, diffing, and deduplicating repos in awesome-xxx lists.
 Pass a Markdown file and it fetches the latest info for all listed repositories.
 
 ### How This Differs from gh CLI / GitHub API
@@ -89,6 +94,9 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 |---|---|---|
 | Bulk update star counts in Markdown | Manually extract URLs, call `gh api` per repo, rewrite Markdown | `update-stars awesome.md` — extract, update, diff report in one command |
 | Bulk broken link detection | Write a script to check each URL | `check-links awesome.md` |
+| Repository health check | Check each repo via `gh api` individually | `health awesome.md` — detect archived, stale, unlicensed repos |
+| List diff comparison | `git diff` + manually extract URLs | `diff awesome.md --ref HEAD~1` — show added/removed repos |
+| Fork duplicate detection | Check fork info per repo individually | `dedupe awesome.md` — group repos by upstream |
 | List statistics summary | Write your own aggregation script | `stats awesome.md` — total stars, language distribution |
 | Output in awesome-list format | Format API responses yourself | `--format markdown` with star badges |
 
@@ -142,17 +150,37 @@ github-curator update-stars awesome-robotics.md
 github-curator update-stars awesome-robotics.md --dry-run  # 変更を確認のみ / preview only
 ```
 
-### トレンドリポジトリ検索 / Trending Repos
+### ヘルスチェック / Health Check
 
-GitHub 上のリポジトリをトピック・言語で検索します。
+リスト内リポジトリの健全性（アーカイブ・放置・ライセンス不明など）を一括チェックします。
 
-Search for trending repositories by topic or language:
+Check health status (archived, stale, no license) for all repos in a markdown file:
 
 ```bash
-github-curator trending "topic:robotics language:python"
-github-curator trending "topic:llm" --sort stars --max 50
-github-curator trending "topic:ros2" --output json
-github-curator trending "topic:slam" --output markdown
+github-curator health awesome-robotics.md
+github-curator health awesome-robotics.md --only-problems  # 問題のあるリポのみ表示 / show only problematic repos
+```
+
+### 差分比較 / Diff
+
+Markdown ファイルの変更差分（追加・削除されたリポジトリ）を表示します。
+
+Compare repos in a markdown file against a previous version:
+
+```bash
+github-curator diff awesome-robotics.md                    # HEAD~1 と比較 / compare against HEAD~1
+github-curator diff awesome-robotics.md --ref main~3       # 特定コミットと比較 / compare against specific ref
+github-curator diff awesome-robotics.md --against old.md   # 別ファイルと比較 / compare against another file
+```
+
+### 重複検出 / Dedupe
+
+同一アップストリームのフォークなど、重複・関連リポジトリを検出します。
+
+Detect duplicate and related repos (forks of the same upstream):
+
+```bash
+github-curator dedupe awesome-robotics.md
 ```
 
 ### リンク切れチェック / Check Links
@@ -178,36 +206,33 @@ github-curator export awesome-robotics.md --format markdown --output repos.md
 
 ### 実行サンプル / Examples
 
-#### トレンドリポジトリ検索 / Trending Repos
+#### ヘルスチェック / Health Check
 
 ```
-$ github-curator trending "topic:slam" --max 5
-Searching: topic:slam (sort=stars, max=5)
-                              GitHub Repositories
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Repository                         ┃  Stars ┃ Forks ┃ Language ┃ Updated  ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
-│ AtsushiSakai/PythonRobotics        │ 28,909 │ 7,239 │ Python   │ 2026-03  │
-│ cartographer-project/cartographer  │  7,801 │ 2,328 │ C++      │ 2026-03  │
-│ gaoxiang12/slambook                │  7,372 │ 3,317 │ C++      │ 2026-03  │
-└────────────────────────────────────┴────────┴───────┴──────────┴──────────┘
+$ github-curator health awesome-robotics.md --only-problems
+Checking health of 15 repositories ...
+                              Repository Health
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Repo                               ┃  Stars ┃ Last Push  ┃ Status   ┃ Issues                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ old-org/deprecated-lib             │    200 │ 2022-01-15 │ critical │ No updates for >2 years  │
+│ someone/experimental               │    150 │ 2025-06-01 │ warning  │ No license               │
+└────────────────────────────────────┴────────┴────────────┴──────────┴──────────────────────────┘
 ```
 
-#### 言語フィルタ付きトレンド / Trending with Language Filter
+#### 差分比較 / Diff
 
 ```
-$ github-curator trending "topic:robotics" --language python --max 5
-Searching: topic:robotics language:python (sort=stars, max=5)
-                              GitHub Repositories
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Repository                  ┃  Stars ┃  Forks ┃ Language ┃ Updated  ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
-│ commaai/openpilot           │ 60,362 │ 10,714 │ Python   │ 2026-03  │
-│ AtsushiSakai/PythonRobotics │ 28,909 │  7,239 │ Python   │ 2026-03  │
-│ zauberzeug/nicegui          │ 15,524 │    910 │ Python   │ 2026-03  │
-│ DLR-RM/stable-baselines3    │ 12,920 │  2,090 │ Python   │ 2026-03  │
-│ kornia/kornia               │ 11,120 │  1,162 │ Python   │ 2026-03  │
-└─────────────────────────────┴────────┴────────┴──────────┴──────────┘
+$ github-curator diff awesome-robotics.md --ref HEAD~1
+
+Added (2):
+  + newowner/cool-project
+  + another/new-repo
+
+Removed (1):
+  - oldowner/removed-repo
+
+Common repos: 12
 ```
 
 #### スター数更新 / Update Stars

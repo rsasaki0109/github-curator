@@ -76,41 +76,6 @@ def update_stars(
 
 
 @app.command()
-def trending(
-    query: str = typer.Argument("stars:>1000", help="Search query (e.g. 'topic:robotics language:python')."),
-    sort: str = typer.Option("stars", "--sort", "-s", help="Sort by: stars, forks, updated."),
-    max_results: int = typer.Option(25, "--max", "-m", help="Maximum number of results."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: table (default), markdown, json."),
-    language: Optional[str] = typer.Option(None, "--language", "-l", help="Filter by programming language."),
-) -> None:
-    """Search trending repositories on GitHub."""
-    from github_curator.formatter import format_as_json, format_as_markdown, format_as_table
-    from github_curator.github_api import GitHubAPI
-
-    # Append language filter to query if specified
-    effective_query = query
-    if language:
-        effective_query = f"{query} language:{language}"
-
-    console.print(f"[bold]Searching: [cyan]{effective_query}[/cyan] (sort={sort}, max={max_results})[/bold]")
-
-    with GitHubAPI() as api:
-        repos = api.search_repos(query=effective_query, sort_by=sort, max_results=max_results)
-
-    if not repos:
-        console.print("[yellow]No results found.[/yellow]")
-        raise typer.Exit()
-
-    fmt = (output or "table").lower()
-    if fmt == "json":
-        console.print(format_as_json(repos))
-    elif fmt == "markdown":
-        console.print(format_as_markdown(repos))
-    else:
-        console.print(format_as_table(repos))
-
-
-@app.command()
 def check_links(
     file: Path = typer.Argument(..., help="Path to a markdown file to check."),
 ) -> None:
@@ -270,6 +235,178 @@ def stats(
 
     console.print()
     console.print(lang_table)
+
+
+@app.command()
+def health(
+    file: Path = typer.Argument(..., help="Path to a markdown file to check repo health."),
+    only_problems: bool = typer.Option(False, "--only-problems", help="Show only warning/critical repos."),
+) -> None:
+    """Check health status of all repos in a markdown file."""
+    import sys
+
+    from rich.table import Table
+
+    from github_curator.github_api import GitHubAPI
+    from github_curator.health import compute_health
+    from github_curator.parser import parse_markdown_repos
+
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(code=1)
+
+    content = file.read_text(encoding="utf-8")
+    repo_refs = parse_markdown_repos(content)
+
+    if not repo_refs:
+        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
+        raise typer.Exit()
+
+    console.print(f"[bold]Checking health of {len(repo_refs)} repositories ...[/bold]")
+
+    results: list[tuple] = []
+    has_critical = False
+
+    with GitHubAPI() as api:
+        for ref in repo_refs:
+            try:
+                info = api.get_repo_info(ref.owner, ref.name)
+                h = compute_health(info)
+                if h["status"] == "critical":
+                    has_critical = True
+                if only_problems and h["status"] == "healthy":
+                    continue
+                results.append((info, h))
+                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+            except Exception as e:
+                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+
+    table = Table(title="Repository Health", show_lines=False)
+    table.add_column("Repo", style="cyan", no_wrap=True)
+    table.add_column("Stars", justify="right", style="yellow")
+    table.add_column("Last Push", style="blue")
+    table.add_column("Status")
+    table.add_column("Issues")
+
+    for info, h in results:
+        pushed = info.pushed_at.strftime("%Y-%m-%d") if info.pushed_at else "N/A"
+        status = h["status"]
+        if status == "healthy":
+            status_str = "[green]healthy[/green]"
+        elif status == "warning":
+            status_str = "[yellow]warning[/yellow]"
+        else:
+            status_str = "[red]critical[/red]"
+        issues_str = ", ".join(h["issues"]) if h["issues"] else ""
+        table.add_row(info.full_name, f"{info.stars:,}", pushed, status_str, issues_str)
+
+    console.print()
+    console.print(table)
+
+    if has_critical:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def diff(
+    file: Path = typer.Argument(..., help="Path to a markdown file."),
+    against: Optional[Path] = typer.Option(None, "--against", help="Path to another markdown file to compare against."),
+    ref: Optional[str] = typer.Option(None, "--ref", help="Git ref to compare against (e.g. HEAD~1, commit hash)."),
+) -> None:
+    """Compare repos in a markdown file against another version."""
+    import subprocess
+
+    from github_curator.differ import diff_lists
+
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(code=1)
+
+    new_content = file.read_text(encoding="utf-8")
+
+    if against:
+        if not against.exists():
+            console.print(f"[red]File not found: {against}[/red]")
+            raise typer.Exit(code=1)
+        old_content = against.read_text(encoding="utf-8")
+    else:
+        git_ref = ref or "HEAD~1"
+        try:
+            result = subprocess.run(
+                ["git", "show", f"{git_ref}:{file}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            old_content = result.stdout
+        except subprocess.CalledProcessError as e:
+            console.print(f"[red]Failed to get {file} from {git_ref}: {e.stderr.strip()}[/red]")
+            raise typer.Exit(code=1)
+
+    dr = diff_lists(old_content, new_content)
+
+    if dr.added:
+        console.print(f"\n[green bold]Added ({len(dr.added)}):[/green bold]")
+        for r in dr.added:
+            console.print(f"  [green]+ {r.owner}/{r.name}[/green]")
+
+    if dr.removed:
+        console.print(f"\n[red bold]Removed ({len(dr.removed)}):[/red bold]")
+        for r in dr.removed:
+            console.print(f"  [red]- {r.owner}/{r.name}[/red]")
+
+    if not dr.added and not dr.removed:
+        console.print("[green]No differences found.[/green]")
+    else:
+        console.print(f"\n[dim]Common repos: {len(dr.common)}[/dim]")
+
+
+@app.command()
+def dedupe(
+    file: Path = typer.Argument(..., help="Path to a markdown file to check for duplicates."),
+) -> None:
+    """Detect duplicate and related repositories (forks of same upstream)."""
+    from github_curator.dedupe import find_duplicates
+    from github_curator.github_api import GitHubAPI
+    from github_curator.parser import parse_markdown_repos
+
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(code=1)
+
+    content = file.read_text(encoding="utf-8")
+    repo_refs = parse_markdown_repos(content)
+
+    if not repo_refs:
+        console.print("[yellow]No GitHub repository URLs found.[/yellow]")
+        raise typer.Exit()
+
+    console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
+
+    repos = []
+    with GitHubAPI() as api:
+        for ref in repo_refs:
+            try:
+                info = api.get_repo_info(ref.owner, ref.name)
+                repos.append(info)
+                console.print(f"  [green]OK[/green] {ref.owner}/{ref.name}")
+            except Exception as e:
+                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+
+    groups = find_duplicates(repos)
+
+    if not groups:
+        console.print("\n[green]No duplicate or related repos found.[/green]")
+        return
+
+    console.print(f"\n[bold]Found {len(groups)} group(s) of related repos:[/bold]")
+    for i, group in enumerate(groups, 1):
+        console.print(f"\n[bold cyan]Group {i}:[/bold cyan]")
+        best = max(group, key=lambda r: r.stars)
+        for repo in sorted(group, key=lambda r: -r.stars):
+            fork_tag = " [dim](fork)[/dim]" if repo.is_fork else ""
+            rec = " [green]<-- recommended[/green]" if repo is best else ""
+            console.print(f"  {repo.full_name} ({repo.stars:,} stars){fork_tag}{rec}")
 
 
 if __name__ == "__main__":

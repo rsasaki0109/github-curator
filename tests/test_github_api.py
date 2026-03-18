@@ -30,6 +30,12 @@ def _make_mock_repo(
     repo.updated_at = MagicMock()
     repo.updated_at.isoformat.return_value = "2025-01-15T10:00:00"
     repo.get_topics.return_value = ["python", "testing"]
+    repo.pushed_at = MagicMock()
+    repo.open_issues_count = 5
+    repo.license = MagicMock()
+    repo.license.name = "MIT License"
+    repo.fork = False
+    repo.parent = None
     return repo
 
 
@@ -52,26 +58,6 @@ class TestGetRepoInfo:
         assert info.language == "Python"
         assert info.description == "A test repo"
         assert info.archived is False
-
-    @patch("github_curator.github_api.Github")
-    def test_search_repos(self, mock_github_cls):
-        mock_client = MagicMock()
-        mock_github_cls.return_value = mock_client
-
-        mock_results = MagicMock()
-        mock_results.__getitem__ = MagicMock(
-            side_effect=lambda s: [_make_mock_repo(), _make_mock_repo(name="repo2", stars=50)]
-        )
-        mock_client.search_repositories.return_value = mock_results
-
-        api = GitHubAPI()
-        api._client = mock_client
-        repos = api.search_repos("language:python", max_results=2)
-
-        assert len(repos) == 2
-        assert repos[0].stars == 100
-        assert repos[1].name == "repo2"
-
 
 class TestCheckRepoExists:
     @patch("github_curator.github_api.Github")
