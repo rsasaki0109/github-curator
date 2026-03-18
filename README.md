@@ -4,17 +4,45 @@
 [![Python](https://img.shields.io/pypi/pyversions/github-curator)](https://pypi.org/project/github-curator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-GitHub リポジトリの追跡・キュレーション CLI ツール。
-Awesome リストのスター数更新、トレンドリポジトリ検索、リンク切れチェックなどを行います。
+**あなたの awesome-list、スター数いつのデータですか？**
 
-姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) と組み合わせることで、論文とリポジトリの両方を統合管理できます。データ形式（JSON エクスポート）は相互運用可能です。
+awesome-xxx リストのスター数は放置すると古くなり、リンク切れも気づかない。
+でも数百リポジトリを手動で確認するのは現実的じゃない。
+
+**github-curator は awesome-list のメンテナンスを自動化します。**
+
+```bash
+# Markdown ファイルを渡すだけ。全リポジトリのスター数を一括更新。
+$ github-curator update-stars awesome-slam.md
+Changes (3):
+  AtsushiSakai/PythonRobotics: 28,500 -> 28,909 (+409)
+  cartographer-project/cartographer: 7,750 -> 7,801 (+51)
+
+# リンク切れも一発チェック。
+$ github-curator check-links awesome-slam.md
+  OK   AtsushiSakai/PythonRobotics
+  FAIL old-user/deleted-repo — Not Found
+```
+
+| こんな課題 | github-curator の解決策 |
+|---|---|
+| スター数が半年前のまま | `update-stars` で全リポジトリのスター数を一括更新 |
+| リンク切れに気づかない | `check-links` で 404 になったリポジトリを検出 |
+| 分野のトレンドを追いたい | `trending` でトピック・言語別にリポジトリを検索 |
+| リストの統計が知りたい | `stats` で総スター数・言語分布などをサマリー表示 |
+| 定期メンテを自動化したい | GitHub Actions で週次自動更新 |
+
+姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator)（arXiv 新着論文の自動提案）と組み合わせると、awesome-list のメンテナンスがほぼ全自動になります。
 
 ---
 
-A CLI tool for tracking and curating GitHub repositories.
-Update star counts in awesome lists, search trending repos, check for broken links, and export data.
+**Are your awesome-list star counts still up to date?**
 
-Works alongside the companion project [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) for unified paper + repository management. Both tools share compatible JSON export formats.
+Star counts in awesome-xxx lists go stale fast, and broken links pile up silently. Manually checking hundreds of repos isn't practical.
+
+github-curator automates awesome-list maintenance: bulk star updates, dead link detection, trending repo discovery, and list statistics — all from the CLI.
+
+Works alongside [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator) (automated new paper suggestions) for near-fully-automated list maintenance. Both tools share compatible JSON export formats.
 
 ## インストール / Installation
 
