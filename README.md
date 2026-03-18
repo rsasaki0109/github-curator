@@ -4,8 +4,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/github-curator)](https://pypi.org/project/github-curator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-GitHub リポジトリのリンクを含む Markdown ファイルを入力に、スター数の一括更新・リンク切れチェック・ヘルスチェック・差分比較・重複検出を行う CLI ツールです。
-Markdown ファイルを渡すだけで、記載されている全リポジトリの情報を一括で取得・更新できます。
+GitHub リポジトリをまとめた Markdown ファイルのメンテナンスを自動化する CLI ツールです。
+スター数の一括更新、リンク切れチェック、ヘルスチェック、差分比較、重複検出ができます。
 
 ```bash
 # Markdown ファイルを渡すだけ。全リポジトリのスター数を一括更新。
@@ -71,7 +71,8 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 
 ---
 
-A CLI tool that takes Markdown files containing GitHub repository links and batch-updates star counts, checks for broken links, runs health checks, diffs changes, and detects duplicates.
+A CLI tool for maintaining Markdown files that list GitHub repositories.
+Batch-update star counts, check for broken links, run health checks, diff changes, and detect duplicates.
 Pass a Markdown file and it fetches the latest info for all listed repositories.
 
 ### How This Differs from gh CLI / GitHub API
