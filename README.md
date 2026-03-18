@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 複数の GitHub リポジトリの健全性を一括チェックする CLI ツールです。
-Markdown ファイルに書かれたリポジトリ URL を自動抽出し、アーカイブ・放置・リンク切れ・フォーク重複をまとめて検出します。
+アーカイブ済み・長期放置・リンク切れ・フォーク重複をまとめて検出します。
 
 ```bash
 $ github-curator health awesome-slam.md --only-problems
