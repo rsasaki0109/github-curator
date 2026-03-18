@@ -4,33 +4,31 @@
 [![Python](https://img.shields.io/pypi/pyversions/github-curator)](https://pypi.org/project/github-curator/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-GitHub リポジトリをまとめた Markdown ファイルのメンテナンスを自動化する CLI ツールです。
-スター数の一括更新、リンク切れチェック、ヘルスチェック、差分比較、重複検出ができます。
+複数の GitHub リポジトリの健全性を一括チェックする CLI ツールです。
+Markdown ファイルに書かれたリポジトリ URL を自動抽出し、アーカイブ・放置・リンク切れ・フォーク重複をまとめて検出します。
 
 ```bash
-# Markdown ファイルを渡すだけ。全リポジトリのスター数を一括更新。
-$ github-curator update-stars awesome-slam.md
-Changes (3):
-  AtsushiSakai/PythonRobotics: 28,500 -> 28,909 (+409)
-  cartographer-project/cartographer: 7,750 -> 7,801 (+51)
-
-# リンク切れも一発チェック。
-$ github-curator check-links awesome-slam.md
-  OK   AtsushiSakai/PythonRobotics
-  FAIL old-user/deleted-repo — Not Found
+$ github-curator health awesome-slam.md --only-problems
+                              Repository Health
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Repo                         ┃  Stars ┃ Last Push  ┃ Status   ┃ Issues                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ xdspacelab/openvslam         │  3,200 │ 2022-01-15 │ critical │ Archived, >2 years stale │
+│ laboshinl/loam_velodyne      │  1,700 │ 2021-08-10 │ critical │ No updates for >2 years  │
+│ cartographer-project/carto…  │  7,801 │ 2023-11-20 │ warning  │ No updates for >1 year   │
+└──────────────────────────────┴────────┴────────────┴──────────┴──────────────────────────┘
 ```
 
-| こんな課題 | github-curator の解決策 |
+| 機能 | 説明 |
 |---|---|
-| スター数が半年前のまま | `update-stars` で全リポジトリのスター数を一括更新 |
-| リンク切れに気づかない | `check-links` で 404 になったリポジトリを検出 |
-| リポジトリの健全性を確認したい | `health` でアーカイブ・放置・ライセンス不明を一括検出 |
-| リストの変更差分を見たい | `diff` で追加・削除されたリポジトリを比較 |
-| フォーク重複を検出したい | `dedupe` で同一アップストリームのフォークをグループ化 |
-| リストの統計が知りたい | `stats` で総スター数・言語分布などをサマリー表示 |
-| 定期メンテを自動化したい | GitHub Actions で週次自動更新 |
+| `health` | アーカイブ・長期未更新・ライセンス不明を一括検出 |
+| `check-links` | リンク切れ（404）になったリポジトリを検出 |
+| `dedupe` | 同一アップストリームのフォーク・重複を検出 |
+| `update-stars` | Markdown 内のスター数を最新値に一括更新 |
+| `diff` | ファイルの版間で追加・削除されたリポジトリを比較 |
+| `stats` | 総スター数・言語分布などの統計サマリー |
 
-姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator)（arXiv 新着論文の自動提案）と組み合わせて使えます。
+姉妹プロジェクト [arxiv-curator](https://github.com/rsasaki0109/arxiv-curator)（arXiv 新着論文の自動発見）と組み合わせて使えます。
 
 ### gh CLI / GitHub API を直接使う場合との違い
 
@@ -71,14 +69,13 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 
 ---
 
-A CLI tool for maintaining Markdown files that list GitHub repositories.
-Batch-update star counts, check for broken links, run health checks, diff changes, and detect duplicates.
-Pass a Markdown file and it fetches the latest info for all listed repositories.
+A CLI tool for batch health-checking multiple GitHub repositories.
+It automatically extracts repo URLs from a Markdown file and detects archived repos, stale repos, broken links, and fork duplicates.
 
 ### How This Differs from gh CLI / GitHub API
 
-The GitHub CLI (`gh`) can search repos and fetch info (`gh search repos --topic slam --sort stars --json`, `gh api repos/owner/repo`, etc.).
-github-curator's strength is **batch-processing a Markdown file containing GitHub URLs as input**.
+The GitHub CLI (`gh`) can search repos and fetch info per repo (`gh search repos`, `gh api repos/owner/repo`, etc.).
+github-curator's strength is **batch-analyzing multiple repos at once and reporting problems across the entire list**.
 
 **What gh CLI already does well (overlapping features):**
 
