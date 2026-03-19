@@ -275,26 +275,24 @@ github-curator trend --topic slam --max 10 -o trend-report.json
 ```
 
 ```
-$ github-curator trend --topic slam --max 5
-                                     Repository Trends
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Repo                       ┃  Stars ┃ Stars/mo ┃            Activity ┃ Status   ┃ Issues/Stars ┃ Forks/Stars ┃ Summary                      ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ org/active-slam            │ 12,500 │      208 │ ██████████ 100      │ growing  │        0.032 │       0.180 │ 12,500 stars, ~208 stars/mo  │
-│ org/stable-project         │  3,200 │       27 │ ██████░░░░ 60       │ stable   │        0.050 │       0.120 │ 3,200 stars, last push 45d   │
-│ org/old-lib                │    800 │        7 │ █░░░░░░░░░ 10       │ inactive │        0.010 │       0.200 │ 800 stars, inactive for 2+y  │
-└────────────────────────────┴────────┴──────────┴─────────────────────┴──────────┴──────────────┴─────────────┴──────────────────────────────┘
-3 growing, 1 stable, 0 declining, 1 inactive
+$ github-curator trend https://github.com/AtsushiSakai/PythonRobotics https://github.com/cartographer-project/cartographer https://github.com/hku-mars/FAST_LIO https://github.com/xdspacelab/openvslam
+
+                               Repository Trends
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┓
+┃ Repo                              ┃  Stars ┃ Stars/mo┃ Activity   ┃ Status    ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━┩
+│ AtsushiSakai/PythonRobotics       │ 28,914 │     238 │ ██████████ │ growing   │
+│ hku-mars/FAST_LIO                 │  4,600 │      67 │ ██░░░░░░░░ │ declining │
+│ cartographer-project/cartographer │  7,801 │      67 │ █░░░░░░░░░ │ inactive  │
+│ xdspacelab/openvslam              │  2,985 │      36 │ ░░░░░░░░░░ │ inactive  │
+└───────────────────────────────────┴────────┴─────────┴────────────┴───────────┘
+
+1 growing, 0 stable, 1 declining, 2 inactive
 
 Comparative Analysis
-  Fastest growing: org/active-slam (208 stars/month)
-  Most active: org/active-slam (pushed 2 days ago)
-  Largest: org/active-slam (12,500 stars)
-
-Sector: slam
-  Topic 'slam' average stars: 5,500
-  Median activity score: 60
-  Growing: 1, Declining/Inactive: 1
+  Fastest growing: AtsushiSakai/PythonRobotics (238 stars/month)
+  Most active: AtsushiSakai/PythonRobotics (pushed 3 days ago)
+  Largest: AtsushiSakai/PythonRobotics (28,914 stars)
 ```
 
 ### 統計サマリー / Stats
@@ -403,8 +401,6 @@ Checking 15 repositories ...
 1 broken link(s) found:
   - old-user/deleted-repo: Not Found
 ```
-
-> **Note**: Examples above are illustrative (not real output).
 
 ## arxiv-curator との連携 / Interoperability with arxiv-curator
 
