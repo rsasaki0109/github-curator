@@ -261,10 +261,15 @@ def health(
     topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
     max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
     only_problems: bool = typer.Option(False, "--only-problems", help="Show only repos with issues."),
+    suggest_alternatives: bool = typer.Option(
+        False, "--suggest-alternatives", "-a",
+        help="Find active forks or replacements for critical/warning repos (extra API calls).",
+    ),
 ) -> None:
     """Check health status of GitHub repositories."""
     from rich.table import Table
 
+    from github_curator.alternatives import find_alternatives
     from github_curator.github_api import GitHubAPI
     from github_curator.health import compute_health
 
@@ -289,30 +294,113 @@ def health(
             except Exception as e:
                 console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
 
-    table = Table(title="Repository Health", show_lines=False)
-    table.add_column("Repo", style="cyan", no_wrap=True)
-    table.add_column("Stars", justify="right", style="yellow")
-    table.add_column("Last Push", style="blue")
-    table.add_column("Status")
-    table.add_column("Issues")
+        table = Table(title="Repository Health", show_lines=False)
+        table.add_column("Repo", style="cyan", no_wrap=True)
+        table.add_column("Stars", justify="right", style="yellow")
+        table.add_column("Last Push", style="blue")
+        table.add_column("Status")
+        table.add_column("Issues")
 
-    for info, h in results:
-        pushed = info.pushed_at.strftime("%Y-%m-%d") if info.pushed_at else "N/A"
-        status = h["status"]
-        if status == "healthy":
-            status_str = "[green]healthy[/green]"
-        elif status == "warning":
-            status_str = "[yellow]warning[/yellow]"
-        else:
-            status_str = "[red]critical[/red]"
-        issues_str = ", ".join(h["issues"]) if h["issues"] else ""
-        table.add_row(info.full_name, f"{info.stars:,}", pushed, status_str, issues_str)
+        for info, h in results:
+            pushed = info.pushed_at.strftime("%Y-%m-%d") if info.pushed_at else "N/A"
+            status = h["status"]
+            if status == "healthy":
+                status_str = "[green]healthy[/green]"
+            elif status == "warning":
+                status_str = "[yellow]warning[/yellow]"
+            else:
+                status_str = "[red]critical[/red]"
+            issues_str = ", ".join(h["issues"]) if h["issues"] else ""
+            table.add_row(info.full_name, f"{info.stars:,}", pushed, status_str, issues_str)
 
-    console.print()
-    console.print(table)
+        console.print()
+        console.print(table)
+
+        # Suggest alternatives for problematic repos
+        if suggest_alternatives:
+            problem_repos = [
+                (info, h) for info, h in results
+                if h["status"] in ("critical", "warning")
+            ]
+            if problem_repos:
+                console.print("\n[bold]Searching for alternatives ...[/bold]")
+                _print_alternatives(problem_repos, api, console)
 
     if has_critical:
         raise typer.Exit(code=1)
+
+
+def _print_alternatives(
+    problem_repos: list[tuple[RepoInfo, dict]],
+    api,
+    console: Console,
+) -> None:
+    """Find and print alternatives for a list of problematic repos."""
+    from github_curator.alternatives import find_alternatives
+
+    any_found = False
+    for info, h in problem_repos:
+        alts = find_alternatives(info, api)
+        if alts:
+            any_found = True
+            issues_summary = ", ".join(h["issues"]).lower()
+            console.print(
+                f"\n  [cyan]{info.full_name}[/cyan] "
+                f"([red]{h['status']}[/red], {issues_summary})"
+            )
+            for alt in alts:
+                pushed_str = (
+                    alt.replacement.pushed_at.strftime("%Y-%m")
+                    if alt.replacement.pushed_at else "N/A"
+                )
+                console.print(
+                    f"    -> [green]{alt.replacement.full_name}[/green] "
+                    f"({alt.replacement.stars:,} stars, last push {pushed_str})"
+                )
+                console.print(f"       {alt.reason}")
+
+    if not any_found:
+        console.print("[dim]No alternatives found.[/dim]")
+
+
+@app.command(name="suggest-alternatives")
+def suggest_alternatives(
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+) -> None:
+    """Find active forks or replacement repos for stale/archived repositories."""
+    from github_curator.alternatives import find_alternatives
+    from github_curator.github_api import GitHubAPI
+    from github_curator.health import compute_health
+
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
+
+    console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
+
+    problem_repos: list[tuple[RepoInfo, dict]] = []
+
+    with GitHubAPI() as api:
+        for ref in repo_refs:
+            try:
+                info = api.get_repo_info(ref.owner, ref.name)
+                h = compute_health(info)
+                console.print(f"  [dim]Fetched[/dim] {ref.owner}/{ref.name}")
+                if h["status"] in ("critical", "warning"):
+                    problem_repos.append((info, h))
+            except Exception as e:
+                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+
+        if not problem_repos:
+            console.print("\n[green]All repositories are healthy. No alternatives needed.[/green]")
+            return
+
+        console.print(
+            f"\n[bold]{len(problem_repos)} repo(s) with issues. "
+            f"Searching for alternatives ...[/bold]"
+        )
+        _print_alternatives(problem_repos, api, console)
 
 
 @app.command()
@@ -367,6 +455,69 @@ def diff(
         console.print("[green]No differences found.[/green]")
     else:
         console.print(f"\n[dim]Common repos: {len(dr.common)}[/dim]")
+
+
+@app.command()
+def trend(
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+) -> None:
+    """Analyze growth trends and activity for repositories."""
+    from rich.table import Table
+
+    from github_curator.github_api import GitHubAPI
+    from github_curator.trend import analyze_trends
+
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
+
+    console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
+
+    with GitHubAPI() as api:
+        repos = _fetch_repo_infos(repo_refs, api, console)
+
+    if not repos:
+        console.print("[yellow]No repository data retrieved.[/yellow]")
+        raise typer.Exit()
+
+    trends = analyze_trends(repos)
+
+    table = Table(title="Repository Trends", show_lines=False)
+    table.add_column("Repo", style="cyan", no_wrap=True)
+    table.add_column("Stars", justify="right", style="yellow")
+    table.add_column("Activity", justify="right")
+    table.add_column("Status")
+    table.add_column("Summary")
+
+    status_colors = {
+        "growing": "green",
+        "stable": "yellow",
+        "declining": "dark_orange",
+        "inactive": "red",
+    }
+
+    counts: dict[str, int] = {"growing": 0, "stable": 0, "declining": 0, "inactive": 0}
+    for t in trends:
+        color = status_colors.get(t.status, "white")
+        counts[t.status] = counts.get(t.status, 0) + 1
+        table.add_row(
+            t.repo.full_name,
+            f"{t.repo.stars:,}",
+            f"{t.activity_score:.0f}",
+            f"[{color}]{t.status}[/{color}]",
+            t.summary,
+        )
+
+    console.print()
+    console.print(table)
+    console.print()
+    console.print(
+        f"[green]{counts['growing']} growing[/green], "
+        f"[yellow]{counts['stable']} stable[/yellow], "
+        f"[dark_orange]{counts['declining']} declining[/dark_orange], "
+        f"[red]{counts['inactive']} inactive[/red]"
+    )
 
 
 @app.command()

@@ -36,10 +36,12 @@ $ github-curator health --topic slam --only-problems --max 10
 | 機能 | 説明 | 入力方法 |
 |---|---|---|
 | `health` | アーカイブ・長期未更新・ライセンス不明を一括検出 | URL / ファイル / トピック |
+| `suggest-alternatives` | 非活発なリポジトリの代替（活発なフォーク等）を提案 | URL / ファイル / トピック |
 | `check-links` | リンク切れ（404）になったリポジトリを検出 | URL / ファイル / トピック |
 | `dedupe` | 同一アップストリームのフォーク・重複を検出 | URL / ファイル / トピック |
 | `stats` | 総スター数・言語分布などの統計サマリー | URL / ファイル / トピック |
 | `export` | リポジトリ情報を JSON/Markdown でエクスポート | URL / ファイル / トピック |
+| `trend` | スター成長率・活動トレンドを分析 | URL / ファイル / トピック |
 | `update-stars` | Markdown 内のスター数を最新値に一括更新 | ファイルのみ |
 | `diff` | ファイルの版間で追加・削除されたリポジトリを比較 | ファイルのみ |
 
@@ -188,6 +190,21 @@ github-curator health https://github.com/org/repo1 https://github.com/org/repo2
 github-curator health -f awesome-robotics.md
 github-curator health --topic slam --max 20
 github-curator health -f awesome-robotics.md --only-problems
+
+# 健全性チェック + 代替リポジトリの提案 / Health check with alternative suggestions
+github-curator health -f repos.md --suggest-alternatives
+```
+
+### 代替リポジトリの提案 / Suggest Alternatives
+
+非活発・アーカイブ済みリポジトリの代替（活発なフォークや親リポジトリ）を提案します。
+
+Find active forks or replacement repos for stale/archived repositories:
+
+```bash
+github-curator suggest-alternatives https://github.com/xdspacelab/openvslam
+github-curator suggest-alternatives -f repos.md
+github-curator suggest-alternatives --topic slam --max 20
 ```
 
 ### リンク切れチェック / Check Links
@@ -212,6 +229,23 @@ Detect duplicate and related repos (forks of the same upstream):
 github-curator dedupe https://github.com/org/repo1 https://github.com/org/repo2
 github-curator dedupe -f awesome-robotics.md
 github-curator dedupe --topic slam
+```
+
+### トレンド分析 / Trend
+
+リポジトリのスター成長率・活動トレンドを分析します。
+
+Analyze star growth rate and activity trends for repositories:
+
+```bash
+# トピックのリポジトリのトレンド分析
+github-curator trend --topic slam --max 20
+
+# 特定リポジトリの分析
+github-curator trend https://github.com/AtsushiSakai/PythonRobotics https://github.com/cartographer-project/cartographer
+
+# ファイルから
+github-curator trend -f awesome-robotics.md
 ```
 
 ### 統計サマリー / Stats
