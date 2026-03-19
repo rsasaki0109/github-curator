@@ -9,6 +9,7 @@ from typing import Optional
 
 from github import Auth, Github, GithubException, RateLimitExceededException
 
+from github_curator.alternatives import extract_keywords
 from github_curator.models import RepoInfo
 from github_curator.parser import RepoRef
 
@@ -66,6 +67,7 @@ class GitHubAPI:
             license_name=r.license.name if r.license else "",
             is_fork=r.fork,
             parent_full_name=r.parent.full_name if r.parent else "",
+            created_at=r.created_at,
         )
 
     def get_repo_info(self, owner: str, repo: str) -> RepoInfo:
@@ -155,6 +157,44 @@ class GitHubAPI:
                 )
             )
         return refs
+
+    def search_similar_repos(self, repo: RepoInfo, max_results: int = 5) -> list[RepoInfo]:
+        """Search for repos similar to the given one by keywords and language.
+
+        Builds a search query from the repo name and description keywords,
+        filters by the same primary language, and excludes archived repos.
+
+        Args:
+            repo: The repository to find similar repos for.
+            max_results: Maximum number of results to return.
+
+        Returns:
+            List of RepoInfo for similar repos (excluding the original).
+        """
+        keywords = extract_keywords(repo.full_name, repo.description or "")
+        if not keywords:
+            return []
+        query = " ".join(keywords[:3])
+        if repo.language:
+            query += f" language:{repo.language}"
+        query += " archived:false"
+
+        def _fetch():
+            results = self._client.search_repositories(
+                query=query,
+                sort="stars",
+                order="desc",
+            )
+            repos_out: list[RepoInfo] = []
+            for r in results[:max_results + 5]:  # fetch extra to account for filtering
+                if r.full_name == repo.full_name:
+                    continue
+                repos_out.append(self._to_repo_info(r))
+                if len(repos_out) >= max_results:
+                    break
+            return repos_out
+
+        return self._retry_on_rate_limit(_fetch)
 
     def get_rate_limit_info(self) -> dict:
         """Return current rate limit status."""

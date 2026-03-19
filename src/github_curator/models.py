@@ -30,6 +30,7 @@ class RepoInfo:
     license_name: str = ""
     is_fork: bool = False
     parent_full_name: str = ""
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not self.url:
@@ -49,6 +50,10 @@ class RepoInfo:
             data["pushed_at"] = self.pushed_at.isoformat()
         else:
             data["pushed_at"] = None
+        if self.created_at:
+            data["created_at"] = self.created_at.isoformat()
+        else:
+            data["created_at"] = None
         data["type"] = "github_repo"
         data["full_name"] = self.full_name
         return data
@@ -73,6 +78,9 @@ class RepoInfo:
         # Convert pushed_at string back to datetime
         if "pushed_at" in filtered and isinstance(filtered["pushed_at"], str):
             filtered["pushed_at"] = datetime.fromisoformat(filtered["pushed_at"])
+        # Convert created_at string back to datetime
+        if "created_at" in filtered and isinstance(filtered["created_at"], str):
+            filtered["created_at"] = datetime.fromisoformat(filtered["created_at"])
         return cls(**filtered)
 
 

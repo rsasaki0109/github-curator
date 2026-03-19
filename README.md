@@ -234,11 +234,14 @@ github-curator dedupe --topic slam
 ### トレンド分析 / Trend
 
 リポジトリのスター成長率・活動トレンドを分析します。
+`created_at` を使った実年齢ベースの成長率推定、比較分析、アクティビティ内訳を表示します。
 
-Analyze star growth rate and activity trends for repositories:
+Analyze star growth rate and activity trends for repositories.
+Uses actual repo age (from `created_at`) for accurate growth estimation,
+comparative analysis across repos, and activity breakdown (issues/stars, forks/stars ratios).
 
 ```bash
-# トピックのリポジトリのトレンド分析
+# トピックのリポジトリのトレンド分析（セクター比較付き）
 github-curator trend --topic slam --max 20
 
 # 特定リポジトリの分析
@@ -246,6 +249,32 @@ github-curator trend https://github.com/AtsushiSakai/PythonRobotics https://gith
 
 # ファイルから
 github-curator trend -f awesome-robotics.md
+
+# JSON 出力
+github-curator trend --topic slam --max 10 -o trend-report.json
+```
+
+```
+$ github-curator trend --topic slam --max 5
+                                     Repository Trends
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Repo                       ┃  Stars ┃ Stars/mo ┃            Activity ┃ Status   ┃ Issues/Stars ┃ Forks/Stars ┃ Summary                      ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ org/active-slam            │ 12,500 │      208 │ ██████████ 100      │ growing  │        0.032 │       0.180 │ 12,500 stars, ~208 stars/mo  │
+│ org/stable-project         │  3,200 │       27 │ ██████░░░░ 60       │ stable   │        0.050 │       0.120 │ 3,200 stars, last push 45d   │
+│ org/old-lib                │    800 │        7 │ █░░░░░░░░░ 10       │ inactive │        0.010 │       0.200 │ 800 stars, inactive for 2+y  │
+└────────────────────────────┴────────┴──────────┴─────────────────────┴──────────┴──────────────┴─────────────┴──────────────────────────────┘
+3 growing, 1 stable, 0 declining, 1 inactive
+
+Comparative Analysis
+  Fastest growing: org/active-slam (208 stars/month)
+  Most active: org/active-slam (pushed 2 days ago)
+  Largest: org/active-slam (12,500 stars)
+
+Sector: slam
+  Topic 'slam' average stars: 5,500
+  Median activity score: 60
+  Growing: 1, Declining/Inactive: 1
 ```
 
 ### 統計サマリー / Stats

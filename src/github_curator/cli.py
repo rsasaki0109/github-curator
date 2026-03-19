@@ -330,37 +330,117 @@ def health(
         raise typer.Exit(code=1)
 
 
+def _collect_alternatives(
+    problem_repos: list[tuple[RepoInfo, dict]],
+    api,
+) -> list[tuple[RepoInfo, dict, list]]:
+    """Find alternatives for a list of problematic repos.
+
+    Returns list of (repo_info, health_dict, alternatives_list) tuples.
+    """
+    from github_curator.alternatives import find_alternatives
+
+    results = []
+    for info, h in problem_repos:
+        alts = find_alternatives(info, api)
+        results.append((info, h, alts))
+    return results
+
+
+def _print_alternatives_table(
+    alt_results: list[tuple[RepoInfo, dict, list]],
+    console: Console,
+) -> None:
+    """Print alternatives as a rich comparison table."""
+    from rich.table import Table
+
+    any_found = False
+    for info, h, alts in alt_results:
+        if not alts:
+            continue
+        any_found = True
+        pushed_str = info.pushed_at.strftime("%Y-%m") if info.pushed_at else "N/A"
+        archived_tag = "archived, " if info.archived else ""
+        console.print(
+            f"\nOriginal: [cyan]{info.full_name}[/cyan] "
+            f"({archived_tag}{info.stars:,} stars, last push {pushed_str})"
+        )
+
+        table = Table(title="Alternatives", show_lines=True)
+        table.add_column("Repo", style="green", no_wrap=True)
+        table.add_column("Stars", justify="right", style="yellow")
+        table.add_column("Last Push", style="blue")
+        table.add_column("Confidence")
+        table.add_column("Why")
+
+        for alt in alts:
+            alt_pushed = (
+                alt.replacement.pushed_at.strftime("%Y-%m")
+                if alt.replacement.pushed_at else "N/A"
+            )
+            conf_color = {"high": "green", "medium": "yellow", "low": "dim"}.get(
+                alt.confidence, "white"
+            )
+            table.add_row(
+                alt.replacement.full_name,
+                f"{alt.replacement.stars:,}",
+                alt_pushed,
+                f"[{conf_color}]{alt.confidence}[/{conf_color}]",
+                alt.reason,
+            )
+
+        console.print(table)
+
+    if not any_found:
+        console.print("[dim]No alternatives found.[/dim]")
+
+
+def _alternatives_to_json(
+    alt_results: list[tuple[RepoInfo, dict, list]],
+) -> str:
+    """Convert alternative results to JSON string."""
+    import json
+
+    output = []
+    for info, h, alts in alt_results:
+        entry = {
+            "original": {
+                "full_name": info.full_name,
+                "stars": info.stars,
+                "archived": info.archived,
+                "last_push": info.pushed_at.isoformat() if info.pushed_at else None,
+                "language": info.language,
+            },
+            "health_status": h["status"],
+            "health_issues": h["issues"],
+            "alternatives": [
+                {
+                    "full_name": alt.replacement.full_name,
+                    "stars": alt.replacement.stars,
+                    "last_push": (
+                        alt.replacement.pushed_at.isoformat()
+                        if alt.replacement.pushed_at else None
+                    ),
+                    "language": alt.replacement.language,
+                    "reason": alt.reason,
+                    "confidence": alt.confidence,
+                    "url": alt.replacement.url,
+                }
+                for alt in alts
+            ],
+        }
+        output.append(entry)
+    return json.dumps(output, ensure_ascii=False, indent=2)
+
+
 def _print_alternatives(
     problem_repos: list[tuple[RepoInfo, dict]],
     api,
     console: Console,
 ) -> None:
-    """Find and print alternatives for a list of problematic repos."""
-    from github_curator.alternatives import find_alternatives
-
-    any_found = False
-    for info, h in problem_repos:
-        alts = find_alternatives(info, api)
-        if alts:
-            any_found = True
-            issues_summary = ", ".join(h["issues"]).lower()
-            console.print(
-                f"\n  [cyan]{info.full_name}[/cyan] "
-                f"([red]{h['status']}[/red], {issues_summary})"
-            )
-            for alt in alts:
-                pushed_str = (
-                    alt.replacement.pushed_at.strftime("%Y-%m")
-                    if alt.replacement.pushed_at else "N/A"
-                )
-                console.print(
-                    f"    -> [green]{alt.replacement.full_name}[/green] "
-                    f"({alt.replacement.stars:,} stars, last push {pushed_str})"
-                )
-                console.print(f"       {alt.reason}")
-
-    if not any_found:
-        console.print("[dim]No alternatives found.[/dim]")
+    """Find and print alternatives for a list of problematic repos (legacy helper)."""
+    alt_results = _collect_alternatives(problem_repos, api)
+    _print_alternatives_table(alt_results, console)
 
 
 @app.command(name="suggest-alternatives")
@@ -369,15 +449,16 @@ def suggest_alternatives(
     file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
     topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
     max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON for scripting."),
 ) -> None:
     """Find active forks or replacement repos for stale/archived repositories."""
-    from github_curator.alternatives import find_alternatives
     from github_curator.github_api import GitHubAPI
     from github_curator.health import compute_health
 
     repo_refs = _resolve_input(urls, file, topic, max_results, console)
 
-    console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
+    if not json_output:
+        console.print(f"[bold]Fetching info for {len(repo_refs)} repositories ...[/bold]")
 
     problem_repos: list[tuple[RepoInfo, dict]] = []
 
@@ -386,21 +467,33 @@ def suggest_alternatives(
             try:
                 info = api.get_repo_info(ref.owner, ref.name)
                 h = compute_health(info)
-                console.print(f"  [dim]Fetched[/dim] {ref.owner}/{ref.name}")
+                if not json_output:
+                    console.print(f"  [dim]Fetched[/dim] {ref.owner}/{ref.name}")
                 if h["status"] in ("critical", "warning"):
                     problem_repos.append((info, h))
             except Exception as e:
-                console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
+                if not json_output:
+                    console.print(f"  [red]SKIP[/red] {ref.owner}/{ref.name}: {e}")
 
         if not problem_repos:
-            console.print("\n[green]All repositories are healthy. No alternatives needed.[/green]")
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("\n[green]All repositories are healthy. No alternatives needed.[/green]")
             return
 
-        console.print(
-            f"\n[bold]{len(problem_repos)} repo(s) with issues. "
-            f"Searching for alternatives ...[/bold]"
-        )
-        _print_alternatives(problem_repos, api, console)
+        if not json_output:
+            console.print(
+                f"\n[bold]{len(problem_repos)} repo(s) with issues. "
+                f"Searching for alternatives ...[/bold]"
+            )
+
+        alt_results = _collect_alternatives(problem_repos, api)
+
+        if json_output:
+            console.print(_alternatives_to_json(alt_results))
+        else:
+            _print_alternatives_table(alt_results, console)
 
 
 @app.command()
@@ -463,12 +556,19 @@ def trend(
     file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
     topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
     max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save trend analysis as JSON."),
 ) -> None:
     """Analyze growth trends and activity for repositories."""
     from rich.table import Table
 
     from github_curator.github_api import GitHubAPI
-    from github_curator.trend import analyze_trends
+    from github_curator.trend import (
+        _activity_bar,
+        analyze_trends,
+        build_comparative_summary,
+        build_sector_summary,
+        save_trends_json,
+    )
 
     repo_refs = _resolve_input(urls, file, topic, max_results, console)
 
@@ -483,11 +583,15 @@ def trend(
 
     trends = analyze_trends(repos)
 
+    # --- Table ---
     table = Table(title="Repository Trends", show_lines=False)
     table.add_column("Repo", style="cyan", no_wrap=True)
     table.add_column("Stars", justify="right", style="yellow")
+    table.add_column("Stars/mo", justify="right", style="magenta")
     table.add_column("Activity", justify="right")
     table.add_column("Status")
+    table.add_column("Issues/Stars", justify="right", style="dim")
+    table.add_column("Forks/Stars", justify="right", style="dim")
     table.add_column("Summary")
 
     status_colors = {
@@ -501,11 +605,15 @@ def trend(
     for t in trends:
         color = status_colors.get(t.status, "white")
         counts[t.status] = counts.get(t.status, 0) + 1
+        bar = _activity_bar(t.activity_score)
         table.add_row(
             t.repo.full_name,
             f"{t.repo.stars:,}",
-            f"{t.activity_score:.0f}",
+            f"{t.monthly_star_rate:.0f}",
+            f"{bar} {t.activity_score:.0f}",
             f"[{color}]{t.status}[/{color}]",
+            f"{t.open_issues_ratio:.3f}",
+            f"{t.fork_ratio:.3f}",
             t.summary,
         )
 
@@ -518,6 +626,27 @@ def trend(
         f"[dark_orange]{counts['declining']} declining[/dark_orange], "
         f"[red]{counts['inactive']} inactive[/red]"
     )
+
+    # --- Comparative summary ---
+    if len(trends) > 1:
+        insights = build_comparative_summary(trends)
+        if insights:
+            console.print("\n[bold]Comparative Analysis[/bold]")
+            for line in insights:
+                console.print(f"  {line}")
+
+    # --- Sector summary (when using --topic) ---
+    if topic and len(trends) > 0:
+        sector = build_sector_summary(trends, topic)
+        if sector:
+            console.print(f"\n[bold]Sector: {topic}[/bold]")
+            for line in sector:
+                console.print(f"  {line}")
+
+    # --- JSON output ---
+    if output:
+        save_trends_json(trends, output, topic=topic)
+        console.print(f"\n[green]Saved trend analysis to {output}[/green]")
 
 
 @app.command()
