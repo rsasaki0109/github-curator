@@ -36,7 +36,7 @@ $ github-curator health --topic slam --only-problems --max 10
 | 機能 | 説明 | 入力方法 |
 |---|---|---|
 | `health` | アーカイブ・長期未更新・ライセンス不明を一括検出 | URL / ファイル / トピック |
-| `suggest-alternatives` | 非活発なリポジトリの代替（活発なフォーク等）を提案 | URL / ファイル / トピック |
+| `suggest-alternatives` | 非活発なリポジトリの代替（フォーク・類似リポ検索・confidence付き、`--json`対応） | URL / ファイル / トピック |
 | `check-links` | リンク切れ（404）になったリポジトリを検出 | URL / ファイル / トピック |
 | `dedupe` | 同一アップストリームのフォーク・重複を検出 | URL / ファイル / トピック |
 | `stats` | 総スター数・言語分布などの統計サマリー | URL / ファイル / トピック |
@@ -197,14 +197,34 @@ github-curator health -f repos.md --suggest-alternatives
 
 ### 代替リポジトリの提案 / Suggest Alternatives
 
-非活発・アーカイブ済みリポジトリの代替（活発なフォークや親リポジトリ）を提案します。
+非活発・アーカイブ済みリポジトリの代替（活発なフォーク、親リポジトリ、類似リポジトリ）を提案します。
+3つの検索戦略で代替を探します: (1) 活発なフォーク、(2) 親リポジトリ、(3) キーワード類似検索。
+各提案には confidence（high / medium / low）が付きます。
 
-Find active forks or replacement repos for stale/archived repositories:
+Find active forks, parent repos, or similar repos for stale/archived repositories.
+Three search strategies: (1) active forks, (2) parent repo, (3) keyword-based similar repo search.
+Each suggestion includes a confidence level (high / medium / low).
 
 ```bash
 github-curator suggest-alternatives https://github.com/xdspacelab/openvslam
 github-curator suggest-alternatives -f repos.md
 github-curator suggest-alternatives --topic slam --max 20
+
+# JSON output for scripting
+github-curator suggest-alternatives --topic slam --json
+```
+
+```
+$ github-curator suggest-alternatives https://github.com/xdspacelab/openvslam
+
+Original: xdspacelab/openvslam (archived, 2,985 stars, last push 2021-02)
+                          Alternatives
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Repo                      ┃  Stars ┃ Last Push  ┃ Confidence ┃ Why                            ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ stella-cv/stella_vslam    │    800 │ 2026-01    │ medium     │ Active fork (800 stars)        │
+│ other/visual-slam-lib     │  1,200 │ 2026-03    │ low        │ Similar repo (1,200 stars)     │
+└───────────────────────────┴────────┴────────────┴────────────┴────────────────────────────────┘
 ```
 
 ### リンク切れチェック / Check Links
