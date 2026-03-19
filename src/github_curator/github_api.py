@@ -47,28 +47,64 @@ class GitHubAPI:
                 else:
                     raise
 
+    @staticmethod
+    def _to_repo_info(r) -> RepoInfo:
+        """Convert a PyGithub Repository object to RepoInfo."""
+        return RepoInfo(
+            owner=r.owner.login,
+            name=r.name,
+            stars=r.stargazers_count,
+            forks=r.forks_count,
+            description=r.description or "",
+            language=r.language or "",
+            last_updated=r.updated_at.isoformat() if r.updated_at else "",
+            archived=r.archived,
+            url=r.html_url,
+            topics=r.get_topics(),
+            pushed_at=r.pushed_at,
+            open_issues_count=r.open_issues_count,
+            license_name=r.license.name if r.license else "",
+            is_fork=r.fork,
+            parent_full_name=r.parent.full_name if r.parent else "",
+        )
+
     def get_repo_info(self, owner: str, repo: str) -> RepoInfo:
         """Fetch information about a single repository."""
 
         def _fetch():
             r = self._client.get_repo(f"{owner}/{repo}")
-            return RepoInfo(
-                owner=owner,
-                name=repo,
-                stars=r.stargazers_count,
-                forks=r.forks_count,
-                description=r.description or "",
-                language=r.language or "",
-                last_updated=r.updated_at.isoformat() if r.updated_at else "",
-                archived=r.archived,
-                url=r.html_url,
-                topics=r.get_topics(),
-                pushed_at=r.pushed_at,
-                open_issues_count=r.open_issues_count,
-                license_name=r.license.name if r.license else "",
-                is_fork=r.fork,
-                parent_full_name=r.parent.full_name if r.parent else "",
+            return self._to_repo_info(r)
+
+        return self._retry_on_rate_limit(_fetch)
+
+    def get_repo_info_by_fullname(self, full_name: str) -> RepoInfo:
+        """Get repo info by full name (owner/repo)."""
+
+        def _fetch():
+            r = self._client.get_repo(full_name)
+            return self._to_repo_info(r)
+
+        return self._retry_on_rate_limit(_fetch)
+
+    def get_top_forks(self, full_name: str, limit: int = 5) -> list[RepoInfo]:
+        """Get the most-starred forks of a repo.
+
+        Args:
+            full_name: Repository full name (owner/repo).
+            limit: Maximum number of forks to return.
+
+        Returns:
+            List of RepoInfo for the top forks, sorted by stars descending.
+        """
+
+        def _fetch():
+            repo = self._client.get_repo(full_name)
+            forks = sorted(
+                repo.get_forks(),
+                key=lambda f: f.stargazers_count,
+                reverse=True,
             )
+            return [self._to_repo_info(f) for f in forks[:limit]]
 
         return self._retry_on_rate_limit(_fetch)
 
