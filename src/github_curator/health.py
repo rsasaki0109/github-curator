@@ -30,8 +30,9 @@ def compute_health(repo: RepoInfo) -> dict:
         elif age_days > 365:
             issues.append("No updates for >1 year")
 
-    if repo.open_issues_count > 100:
-        issues.append("Many open issues")
+    issue_star_ratio = repo.open_issues_count / max(repo.stars, 1)
+    if issue_star_ratio > 0.1:
+        issues.append("High issue-to-star ratio")
 
     if repo.license_name == "":
         issues.append("No license")

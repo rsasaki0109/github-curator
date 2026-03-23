@@ -297,12 +297,12 @@ def health(
         table = Table(title="Repository Health", show_lines=False)
         table.add_column("Repo", style="cyan", no_wrap=True)
         table.add_column("Stars", justify="right", style="yellow")
-        table.add_column("Last Push", style="blue")
+        table.add_column("Last Push", style="blue", min_width=10)
         table.add_column("Status")
         table.add_column("Issues")
 
         for info, h in results:
-            pushed = info.pushed_at.strftime("%Y-%m-%d") if info.pushed_at else "N/A"
+            pushed = info.pushed_at.strftime("%Y-%m") if info.pushed_at else "N/A"
             status = h["status"]
             if status == "healthy":
                 status_str = "[green]healthy[/green]"
@@ -311,7 +311,8 @@ def health(
             else:
                 status_str = "[red]critical[/red]"
             issues_str = ", ".join(h["issues"]) if h["issues"] else ""
-            table.add_row(info.full_name, f"{info.stars:,}", pushed, status_str, issues_str)
+            repo_link = f"[link=https://github.com/{info.full_name}]{info.full_name}[/link]"
+            table.add_row(repo_link, f"{info.stars:,}", pushed, status_str, issues_str)
 
         console.print()
         console.print(table)
@@ -606,8 +607,9 @@ def trend(
         color = status_colors.get(t.status, "white")
         counts[t.status] = counts.get(t.status, 0) + 1
         bar = _activity_bar(t.activity_score)
+        repo_link = f"[link=https://github.com/{t.repo.full_name}]{t.repo.full_name}[/link]"
         table.add_row(
-            t.repo.full_name,
+            repo_link,
             f"{t.repo.stars:,}",
             f"{t.monthly_star_rate:.0f}",
             f"{bar} {t.activity_score:.0f}",

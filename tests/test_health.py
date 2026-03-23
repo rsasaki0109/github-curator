@@ -47,7 +47,8 @@ class TestComputeHealth:
         assert result["status"] == "warning"
         assert "No updates for >1 year" in result["issues"]
 
-    def test_many_open_issues_is_warning(self):
+    def test_high_issue_ratio_is_warning(self):
+        # 150 issues / 100 stars = 1.5 ratio > 0.1 threshold
         repo = _make_repo(
             pushed_at=datetime.now(timezone.utc) - timedelta(days=10),
             open_issues_count=150,
@@ -55,7 +56,19 @@ class TestComputeHealth:
         )
         result = compute_health(repo)
         assert result["status"] == "warning"
-        assert "Many open issues" in result["issues"]
+        assert "High issue-to-star ratio" in result["issues"]
+
+    def test_large_repo_many_issues_is_healthy(self):
+        # 500 issues / 21000 stars = 0.024 ratio < 0.1 threshold
+        repo = _make_repo(
+            stars=21000,
+            pushed_at=datetime.now(timezone.utc) - timedelta(days=10),
+            open_issues_count=500,
+            license_name="MIT",
+        )
+        result = compute_health(repo)
+        assert result["status"] == "healthy"
+        assert result["issues"] == []
 
     def test_no_license_is_warning(self):
         repo = _make_repo(
