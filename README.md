@@ -11,30 +11,46 @@
 出力: 健全性レポート、リンク切れ検出、重複検出、統計サマリー
 
 ```bash
-# URL を直接指定
-github-curator health https://github.com/org/repo1 https://github.com/org/repo2
+# 1コマンドで完全監査 / Complete audit in one command
+$ github-curator audit --topic slam --max 10
 
-# ファイルから（Markdown でも、URL リストでも）
-github-curator health -f repos.md
+Audit Report: 10 repositories (topic: slam)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# GitHub トピックから
-github-curator health --topic slam --max 20
+Overview
+  10 repos analyzed | 56,234 total stars | 4 languages
+  6 healthy | 2 warning | 1 critical | 1 broken
+
+Action Required
+  CRITICAL (1):
+    x xdspacelab/openvslam -- Archived, No updates for >2 years
+      -> Alternative: stella-cv/stella_vslam (800 stars, medium)
+  BROKEN (1):
+    x old-org/deleted-repo -- 404 Not Found
+
+Warnings (2)
+  ! cartographer-project/cartographer -- No updates for >1 year
+  ! someone/experimental -- No license
+
+Healthy (6)
+  Top by stars: PythonRobotics (28,914), nerfstudio (11,345), FAST_LIO (4,600)
+
+Trends
+  Fastest growing: PythonRobotics (238 stars/month)
+  Most active: PythonRobotics (pushed 3 days ago)
+  Largest: PythonRobotics (28,914 stars)
 ```
 
 ```bash
-$ github-curator health --topic slam --only-problems --max 10
-                              Repository Health
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Repo                         ┃  Stars ┃ Last Push  ┃ Status   ┃ Issues                   ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ xdspacelab/openvslam         │  3,200 │ 2022-01-15 │ critical │ Archived, >2 years stale │
-│ laboshinl/loam_velodyne      │  1,700 │ 2021-08-10 │ critical │ No updates for >2 years  │
-│ cartographer-project/carto…  │  7,801 │ 2023-11-20 │ warning  │ No updates for >1 year   │
-└──────────────────────────────┴────────┴────────────┴──────────┴──────────────────────────┘
+# 入力方法は3つ / Three input methods
+github-curator audit --topic slam --max 20
+github-curator audit -f awesome-robotics.md
+github-curator audit https://github.com/org/repo1 https://github.com/org/repo2
 ```
 
 | 機能 | 説明 | 入力方法 |
 |---|---|---|
+| `audit` | 健全性・リンク切れ・重複・トレンド・代替を1コマンドで完全監査 | URL / ファイル / トピック |
 | `health` | アーカイブ・長期未更新・ライセンス不明を一括検出 | URL / ファイル / トピック |
 | `suggest-alternatives` | 非活発なリポジトリの代替（フォーク・類似リポ検索・confidence付き、`--json`対応） | URL / ファイル / トピック |
 | `check-links` | リンク切れ（404）になったリポジトリを検出 | URL / ファイル / トピック |
@@ -110,6 +126,7 @@ gh api repos/AtsushiSakai/PythonRobotics --jq '{stars: .stargazers_count}'
 
 | Task | gh CLI | github-curator |
 |---|---|---|
+| Complete repo audit (health + links + duplicates + trends) | Run multiple scripts and aggregate manually | `audit --topic slam` |
 | Bulk update star counts in Markdown | Manually extract URLs, call `gh api` per repo, rewrite Markdown | `update-stars awesome.md` |
 | Bulk broken link detection | Write a script to check each URL | `check-links -f awesome.md` or `check-links --topic slam` |
 | Repository health check | Check each repo via `gh api` individually | `health -f awesome.md` or `health --topic slam` |
@@ -177,6 +194,24 @@ github-curator health --topic slam --max 20
 
 # 組み合わせも可能 / Combine methods
 github-curator health https://github.com/org/repo1 -f repos.md --topic slam
+```
+
+### 完全監査 / Audit
+
+健全性・リンク切れ・重複・トレンド・代替を1コマンドで完全監査します。
+
+Run a complete audit (health, links, duplicates, trends, alternatives) in one command:
+
+```bash
+github-curator audit --topic slam --max 20
+github-curator audit -f awesome-robotics.md
+github-curator audit https://github.com/org/repo1 https://github.com/org/repo2
+
+# JSON レポート出力 / Export JSON report
+github-curator audit --topic slam --max 20 -o audit-report.json
+
+# 代替検索・トレンド分析をスキップ / Skip alternatives and trends
+github-curator audit -f repos.md --skip-alternatives --skip-trends
 ```
 
 ### ヘルスチェック / Health Check

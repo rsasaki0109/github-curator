@@ -87,6 +87,123 @@ def main(
 
 
 @app.command()
+def audit(
+    urls: Optional[list[str]] = typer.Argument(None, help="GitHub repository URLs."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="File containing GitHub URLs (Markdown or plain text)."),
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="GitHub topic to search."),
+    max_results: int = typer.Option(50, "--max", "-m", help="Max repos when using --topic."),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save report as JSON file."),
+    skip_alternatives: bool = typer.Option(False, "--skip-alternatives", help="Skip searching for alternatives."),
+    skip_trends: bool = typer.Option(False, "--skip-trends", help="Skip trend analysis."),
+) -> None:
+    """Run a complete audit: health, links, duplicates, trends, and alternatives in one pass."""
+    from github_curator.audit import audit_to_json, audit_to_markdown, run_audit
+    from github_curator.github_api import GitHubAPI
+
+    repo_refs = _resolve_input(urls, file, topic, max_results, console)
+
+    console.print(f"[bold]Auditing {len(repo_refs)} repositories ...[/bold]")
+
+    with GitHubAPI() as api:
+        rl = api.get_rate_limit_info()
+        console.print(f"  API rate limit remaining: {rl['remaining']}/{rl['limit']}")
+
+        result = run_audit(
+            repo_refs,
+            api,
+            check_alternatives=not skip_alternatives,
+            check_trends=not skip_trends,
+        )
+
+    # Print rich console output
+    topic_label = f" (topic: {topic})" if topic else ""
+    num_langs = len(result.languages)
+    console.print()
+    console.print(f"[bold]Audit Report: {result.total_repos} repositories{topic_label}[/bold]")
+    console.print("[dim]" + "\u2501" * 50 + "[/dim]")
+
+    # Overview
+    console.print(f"\n[bold]Overview[/bold]")
+    console.print(
+        f"  {result.total_repos} repos analyzed | "
+        f"{result.total_stars:,} total stars | "
+        f"{num_langs} languages"
+    )
+    console.print(
+        f"  [green]{len(result.healthy)} healthy[/green] | "
+        f"[yellow]{len(result.warnings)} warning[/yellow] | "
+        f"[red]{len(result.critical)} critical[/red] | "
+        f"[red]{len(result.broken_links)} broken[/red]"
+    )
+
+    # Action Required
+    if result.critical or result.broken_links:
+        console.print(f"\n[red bold]Action Required[/red bold]")
+
+        if result.critical:
+            console.print(f"  [red]CRITICAL ({len(result.critical)}):[/red]")
+            for info, h in result.critical:
+                issues_str = ", ".join(h["issues"])
+                console.print(f"    [red]x[/red] {info.full_name} -- {issues_str}")
+                # Show alternatives inline
+                for alt_info, _, alts in result.alternatives:
+                    if alt_info.full_name == info.full_name:
+                        for alt in alts[:1]:
+                            alt_pushed = alt.replacement.pushed_at.strftime("%Y-%m") if alt.replacement.pushed_at else "N/A"
+                            console.print(
+                                f"      -> Alternative: {alt.replacement.full_name} "
+                                f"({alt.replacement.stars:,} stars, {alt.confidence})"
+                            )
+
+        if result.broken_links:
+            console.print(f"  [red]BROKEN ({len(result.broken_links)}):[/red]")
+            for name, error in result.broken_links:
+                console.print(f"    [red]x[/red] {name} -- {error}")
+
+    # Warnings
+    if result.warnings:
+        console.print(f"\n[yellow bold]Warnings ({len(result.warnings)})[/yellow bold]")
+        for info, h in result.warnings:
+            issues_str = ", ".join(h["issues"])
+            console.print(f"  [yellow]![/yellow] {info.full_name} -- {issues_str}")
+
+    # Healthy (top 3)
+    if result.healthy:
+        console.print(f"\n[green bold]Healthy ({len(result.healthy)})[/green bold]")
+        top = sorted(result.healthy, key=lambda x: -x[0].stars)[:3]
+        top_strs = [f"{info.full_name} ({info.stars:,})" for info, _ in top]
+        console.print(f"  Top by stars: {', '.join(top_strs)}")
+
+    # Trends
+    if result.trends:
+        from github_curator.trend import build_comparative_summary
+
+        insights = build_comparative_summary(result.trends)
+        if insights:
+            console.print(f"\n[bold]Trends[/bold]")
+            for line in insights[:3]:
+                console.print(f"  {line}")
+
+    # Duplicates
+    if result.duplicate_groups:
+        console.print(f"\n[bold]Duplicates Found ({len(result.duplicate_groups)} groups)[/bold]")
+        for i, group in enumerate(result.duplicate_groups, 1):
+            best = max(group, key=lambda r: r.stars)
+            names = " / ".join(r.full_name for r in sorted(group, key=lambda r: -r.stars))
+            console.print(f"  Group {i}: {names} (recommended: [green]{best.full_name}[/green])")
+
+    # JSON output
+    if output:
+        json_str = audit_to_json(result, topic=topic)
+        output.write_text(json_str, encoding="utf-8")
+        console.print(f"\n[green]Saved JSON report to {output}[/green]")
+
+    # Exit code
+    if result.critical or result.broken_links:
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def update_stars(
     file: Path = typer.Argument(..., help="Path to an awesome-list markdown file."),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show changes without writing."),
