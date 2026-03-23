@@ -39,7 +39,7 @@ class GitHubAPI:
                 return func(*args, **kwargs)
             except RateLimitExceededException:
                 if attempt < max_retries - 1:
-                    reset_time = self._client.get_rate_limit().core.reset
+                    reset_time = self._client.get_rate_limit().rate.reset
                     wait = max(
                         (reset_time - datetime.now(timezone.utc)).total_seconds() + 1,
                         1,
@@ -200,9 +200,9 @@ class GitHubAPI:
         """Return current rate limit status."""
         rl = self._client.get_rate_limit()
         return {
-            "limit": rl.core.limit,
-            "remaining": rl.core.remaining,
-            "reset": rl.core.reset.isoformat(),
+            "limit": rl.rate.limit,
+            "remaining": rl.rate.remaining,
+            "reset": rl.rate.reset.isoformat(),
         }
 
     def close(self) -> None:
